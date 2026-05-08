@@ -1,0 +1,31 @@
+.stats-cards-vacinas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card-vacina {
+  background: #2D6A4F;
+  border-radius: 12px;
+  padding: 1rem;
+  color: white;
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .stats-cards-vacinas {
+    grid-template-columns: 1fr;
+  }
+}

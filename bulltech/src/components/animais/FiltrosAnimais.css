@@ -1,0 +1,40 @@
+.filters-bar-animais {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.filter-group input,
+.filter-group select {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+  .filters-bar-animais {
+    flex-direction: column;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    flex: 1;
+  }
+}

@@ -1,0 +1,105 @@
+.wizard-form {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.wizard-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.wizard-step {
+  flex: 1;
+  text-align: center;
+  position: relative;
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  background-color: #e0e0e0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.5rem;
+  font-weight: bold;
+  color: #666;
+}
+
+.wizard-step.active .step-number {
+  background-color: #2D6A4F;
+  color: white;
+}
+
+.wizard-step.completed .step-number {
+  background-color: #27ae60;
+  color: white;
+}
+
+.step-title {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.wizard-step.active .step-title {
+  color: #2D6A4F;
+  font-weight: bold;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.btn-prev {
+  background: none;
+  border: 1px solid #ddd;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-next {
+  background-color: #2D6A4F;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-cancel {
+  background: none;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .wizard-steps {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .wizard-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .step-number {
+    margin: 0;
+  }
+}

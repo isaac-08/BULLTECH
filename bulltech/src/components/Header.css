@@ -1,0 +1,87 @@
+.dashboard-header {
+  background-color: #2D6A4F;
+  color: white;
+  padding: 0.8rem 2rem;
+  width: 100%;
+  margin: 0;
+}
+
+.dashboard-header-content {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+}
+
+.logo-img {
+  width: 65px;
+  height: 65px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-text h1 {
+  font-size: 1.6rem;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.logo-text span {
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+
+.user-info {
+  text-align: right;
+}
+
+.user-info h2 {
+  font-size: 0.95rem;
+  margin-bottom: 0.2rem;
+}
+
+.user-info p {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 0.6rem 1rem;
+  }
+  
+  .logo-img {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .logo-text h1 {
+    font-size: 1rem;
+  }
+  
+  .logo-text span {
+    font-size: 0.6rem;
+  }
+  
+  .dashboard-header-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+  
+  .user-info {
+    text-align: center;
+  }
+}

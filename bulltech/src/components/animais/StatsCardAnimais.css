@@ -1,0 +1,41 @@
+.stats-card-animais {
+  background: #2D6A4F;
+  border-radius: 12px;
+  padding: 1rem;
+  color: white;
+}
+
+.stats-card-animais h3 {
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  opacity: 0.9;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.stat-gender {
+  display: flex;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255,255,255,0.2);
+}
+
+.gender-item {
+  flex: 1;
+}
+
+.gender-label {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.gender-number {
+  font-size: 1rem;
+  font-weight: bold;
+}

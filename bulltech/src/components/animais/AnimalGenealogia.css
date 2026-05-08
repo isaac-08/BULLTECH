@@ -1,0 +1,45 @@
+.animal-genealogia {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.animal-genealogia h3 {
+  font-size: 1rem;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.genealogia-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.genealogia-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.genealogia-label {
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.genealogia-value {
+  font-size: 0.85rem;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .genealogia-grid {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
+}

@@ -1,0 +1,82 @@
+.table-container-vacinas {
+  background: white;
+  border-radius: 12px;
+  overflow-x: auto;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.vacinas-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.vacinas-table th {
+  text-align: left;
+  padding: 0.8rem;
+  background-color: #f8f9fa;
+  color: #666;
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.vacinas-table td {
+  padding: 0.8rem;
+  color: #555;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+.status-badge.applied {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem;
+  transition: transform 0.2s;
+}
+
+.action-btn:hover {
+  transform: scale(1.1);
+}
+
+.action-btn.edit {
+  color: #3498db;
+}
+
+.action-btn.view {
+  color: #27ae60;
+}
+
+.action-btn.delete {
+  color: #e74c3c;
+}
+
+.empty-message {
+  text-align: center;
+  color: #999;
+  padding: 2rem;
+}
