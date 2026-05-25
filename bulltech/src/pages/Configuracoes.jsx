@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
+import { authAPI, animaisAPI, lotesAPI, funcionariosAPI, vacinasAPI, pesagensAPI, estoqueAPI } from '../services/api';
+
+// Importando os ícones da sidebar
+import homeIcon from '../assets/icons/home.png';
+import usuarioIcon from '../assets/icons/usuario.png';
+import planosIcon from '../assets/icons/plano.png';
+import cadastroIcon from '../assets/icons/cadastro.png';
+import segurancaIcon from '../assets/icons/seguranca.png';
+import configuracoesIcon from '../assets/icons/config.png';
+import sistemaIcon from '../assets/icons/sistema.png';
+import animalIcon from '../assets/icons/animais.png';
 
 const Configuracoes = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState('perfil');
   const [upgrading, setUpgrading] = useState(false);
   
-  // Dados da avaliação
   const [avaliacao, setAvaliacao] = useState({
     nota: 0,
     comentario: '',
@@ -19,7 +31,6 @@ const Configuracoes = () => {
   const [avaliacoesExistentes, setAvaliacoesExistentes] = useState([]);
   const [mediaNotas, setMediaNotas] = useState(0);
   
-  // Dados do usuário
   const [userData, setUserData] = useState({
     nome: '',
     email: '',
@@ -29,7 +40,6 @@ const Configuracoes = () => {
     especialidade: ''
   });
   
-  // Dados da fazenda
   const [farmData, setFarmData] = useState({
     nome: '',
     endereco: '',
@@ -40,14 +50,12 @@ const Configuracoes = () => {
     email: ''
   });
   
-  // Segurança
   const [securityData, setSecurityData] = useState({
     senhaAtual: '',
     novaSenha: '',
     confirmarSenha: ''
   });
   
-  // Preferências
   const [preferences, setPreferences] = useState({
     tema: 'claro',
     notificacoes: true,
@@ -55,7 +63,15 @@ const Configuracoes = () => {
     dashboardLayout: 'grid'
   });
 
-  // Planos
+  const [stats, setStats] = useState({
+    animais: 0,
+    lotes: 0,
+    funcionarios: 0,
+    vacinas: 0,
+    pesagens: 0,
+    estoque: 0
+  });
+
   const planos = {
     BASICO: {
       id: 'basico',
@@ -131,84 +147,89 @@ const Configuracoes = () => {
   };
 
   useEffect(() => {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-      navigate('/login');
-      return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    setUser(user);
-    
-    // Carregar dados salvos
-    const savedUserData = localStorage.getItem('userConfig');
-    if (savedUserData) {
-      const data = JSON.parse(savedUserData);
-      setUserData(data.userData || {
-        nome: user.nome,
-        email: user.email,
-        telefone: '',
-        fazenda: user.fazenda || '',
-        cargo: '',
-        especialidade: ''
-      });
-      setFarmData(data.farmData || {
-        nome: user.fazenda || '',
-        endereco: '',
-        cidade: '',
-        estado: '',
-        cep: '',
-        telefone: '',
-        email: user.email
-      });
-      setPreferences(data.preferences || {
-        tema: 'claro',
-        notificacoes: true,
-        idioma: 'pt-BR',
-        dashboardLayout: 'grid'
-      });
-    } else {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    try {
+      setLoading(true);
+      
+      const { user: authUser, profile: userProfile } = await authAPI.getCurrentUser();
+      
+      if (!authUser) {
+        navigate('/login');
+        return;
+      }
+      
+      setUser(authUser);
+      setProfile(userProfile);
+      
       setUserData({
-        nome: user.nome,
-        email: user.email,
-        telefone: '',
-        fazenda: user.fazenda || '',
-        cargo: '',
-        especialidade: ''
+        nome: userProfile?.nome || '',
+        email: authUser.email || '',
+        telefone: userProfile?.telefone || '',
+        fazenda: userProfile?.fazenda || '',
+        cargo: userProfile?.cargo || '',
+        especialidade: userProfile?.especialidade || ''
       });
+      
       setFarmData({
-        nome: user.fazenda || '',
-        endereco: '',
-        cidade: '',
-        estado: '',
-        cep: '',
-        telefone: '',
-        email: user.email
+        nome: userProfile?.fazenda || '',
+        endereco: userProfile?.endereco || '',
+        cidade: userProfile?.cidade || '',
+        estado: userProfile?.estado || '',
+        cep: userProfile?.cep || '',
+        telefone: userProfile?.telefone_fazenda || '',
+        email: userProfile?.email_fazenda || ''
       });
-    }
-    
-    // Carregar avaliações
-    const avaliacoes = JSON.parse(localStorage.getItem('avaliacoes') || '[]');
-    setAvaliacoesExistentes(avaliacoes);
-    
-    // Calcular média
-    if (avaliacoes.length > 0) {
-      const soma = avaliacoes.reduce((acc, curr) => acc + curr.nota, 0);
-      setMediaNotas(soma / avaliacoes.length);
-    }
-    
-    // Verificar se usuário já avaliou
-    const jaAvaliou = avaliacoes.some(a => a.usuarioId === user.id);
-    if (jaAvaliou) {
-      const avaliacaoUsuario = avaliacoes.find(a => a.usuarioId === user.id);
-      setAvaliacao({
-        ...avaliacaoUsuario,
-        enviada: true
+      
+      const savedPrefs = localStorage.getItem('userPreferences');
+      if (savedPrefs) {
+        setPreferences(JSON.parse(savedPrefs));
+      }
+      
+      const [animais, lotes, funcionarios, vacinas, pesagens, estoque] = await Promise.all([
+        animaisAPI.getAll(),
+        lotesAPI.getAll(),
+        funcionariosAPI.getAll(),
+        vacinasAPI.getAll(),
+        pesagensAPI.getAll(),
+        estoqueAPI.getAll()
+      ]);
+      
+      setStats({
+        animais: animais.length,
+        lotes: lotes.length,
+        funcionarios: funcionarios.length,
+        vacinas: vacinas.length,
+        pesagens: pesagens.length,
+        estoque: estoque.length
       });
+      
+      const avaliacoes = JSON.parse(localStorage.getItem('avaliacoes') || '[]');
+      setAvaliacoesExistentes(avaliacoes);
+      
+      if (avaliacoes.length > 0) {
+        const soma = avaliacoes.reduce((acc, curr) => acc + curr.nota, 0);
+        setMediaNotas(soma / avaliacoes.length);
+      }
+      
+      const jaAvaliou = avaliacoes.some(a => a.usuarioId === authUser.id);
+      if (jaAvaliou) {
+        const avaliacaoUsuario = avaliacoes.find(a => a.usuarioId === authUser.id);
+        setAvaliacao({
+          ...avaliacaoUsuario,
+          enviada: true
+        });
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+      alert('Erro ao carregar dados');
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
-  }, [navigate]);
+  };
 
   const handleUserChange = (e) => {
     setUserData({ ...userData, [e.target.name]: e.target.value });
@@ -224,47 +245,51 @@ const Configuracoes = () => {
 
   const handlePreferencesChange = (e) => {
     const { name, type, checked, value } = e.target;
-    setPreferences({
+    const newPrefs = {
       ...preferences,
       [name]: type === 'checkbox' ? checked : value
-    });
+    };
+    setPreferences(newPrefs);
+    localStorage.setItem('userPreferences', JSON.stringify(newPrefs));
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     setSaving(true);
     
-    // Atualizar usuário no localStorage
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const userIndex = users.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-      users[userIndex].nome = userData.nome;
-      users[userIndex].email = userData.email;
-      users[userIndex].fazenda = userData.fazenda;
-      localStorage.setItem('users', JSON.stringify(users));
-    }
-    
-    // Atualizar currentUser
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    currentUser.nome = userData.nome;
-    currentUser.email = userData.email;
-    currentUser.fazenda = userData.fazenda;
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    
-    // Salvar todas as configurações
-    const allConfig = {
-      userData,
-      farmData,
-      preferences
-    };
-    localStorage.setItem('userConfig', JSON.stringify(allConfig));
-    
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({
+          nome: userData.nome,
+          telefone: userData.telefone,
+          fazenda: userData.fazenda,
+          cargo: userData.cargo,
+          especialidade: userData.especialidade,
+          endereco: farmData.endereco,
+          cidade: farmData.cidade,
+          estado: farmData.estado,
+          cep: farmData.cep,
+          telefone_fazenda: farmData.telefone,
+          email_fazenda: farmData.email
+        })
+        .eq('auth_id', user.id);
+      
+      if (error) throw error;
+      
       alert('Configurações salvas com sucesso!');
-    }, 500);
+      
+      const { profile: updatedProfile } = await authAPI.getCurrentUser();
+      setProfile(updatedProfile);
+      
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error);
+      alert('Erro ao salvar configurações');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (securityData.novaSenha !== securityData.confirmarSenha) {
       alert('As senhas não coincidem');
       return;
@@ -277,40 +302,29 @@ const Configuracoes = () => {
     
     setSaving(true);
     
-    // Atualizar senha no localStorage
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const userIndex = users.findIndex(u => u.id === user.id);
-    if (userIndex !== -1) {
-      users[userIndex].senha = securityData.novaSenha;
-      localStorage.setItem('users', JSON.stringify(users));
-    }
-    
-    setSecurityData({ senhaAtual: '', novaSenha: '', confirmarSenha: '' });
-    
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: securityData.novaSenha
+      });
+      
+      if (error) throw error;
+      
+      setSecurityData({ senhaAtual: '', novaSenha: '', confirmarSenha: '' });
       alert('Senha alterada com sucesso!');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error);
+      alert('Erro ao alterar senha');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpgrade = (planoId) => {
     setUpgrading(true);
     setTimeout(() => {
       const plano = planos[planoId.toUpperCase()];
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      currentUser.plano = planoId;
-      currentUser.planoNome = plano.nome;
-      currentUser.limites = plano.limites;
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
-      
-      // Atualizar na lista de usuários
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const userIndex = users.findIndex(u => u.id === currentUser.id);
-      if (userIndex !== -1) {
-        users[userIndex].plano = planoId;
-        users[userIndex].planoNome = plano.nome;
-        localStorage.setItem('users', JSON.stringify(users));
-      }
+      localStorage.setItem('userPlano', planoId);
+      localStorage.setItem('userPlanoNome', plano.nome);
       
       alert(`Plano atualizado para ${plano.nome} com sucesso!`);
       setUpgrading(false);
@@ -336,23 +350,21 @@ const Configuracoes = () => {
     const novaAvaliacao = {
       id: Date.now(),
       usuarioId: user.id,
-      usuarioNome: user.nome,
+      usuarioNome: userData.nome,
       usuarioEmail: user.email,
       nota: avaliacao.nota,
       comentario: avaliacao.comentario,
       recomendacao: avaliacao.recomendacao,
       data: new Date().toISOString(),
-      plano: user.plano || 'basico'
+      plano: localStorage.getItem('userPlano') || 'basico'
     };
     
     const avaliacoesExistentes = JSON.parse(localStorage.getItem('avaliacoes') || '[]');
     const usuarioJaAvaliou = avaliacoesExistentes.findIndex(a => a.usuarioId === user.id);
     
     if (usuarioJaAvaliou !== -1) {
-      // Atualizar avaliação existente
       avaliacoesExistentes[usuarioJaAvaliou] = novaAvaliacao;
     } else {
-      // Adicionar nova avaliação
       avaliacoesExistentes.push(novaAvaliacao);
     }
     
@@ -366,14 +378,36 @@ const Configuracoes = () => {
     alert('Obrigado pela sua avaliação! Sua opinião é muito importante para nós.');
   };
 
+  const renderEstrelas = (nota, readonly = false, onChange = null) => {
+    return (
+      <div className="estrelas-container" style={{ display: 'flex', gap: '5px' }}>
+        {[1, 2, 3, 4, 5].map(star => (
+          <span
+            key={star}
+            className={`estrela ${star <= nota ? 'active' : ''}`}
+            onClick={() => !readonly && onChange && onChange(star)}
+            style={{ 
+              cursor: readonly ? 'default' : 'pointer',
+              fontSize: '24px',
+              color: star <= nota ? '#f1c40f' : '#ddd'
+            }}
+          >
+            ★
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  // Seções com os ícones da sidebar
   const sections = [
-    { id: 'perfil', label: 'Perfil do Usuário', icon: '👤' },
-    { id: 'fazenda', label: 'Dados da Fazenda', icon: '🏠' },
-    { id: 'planos', label: 'Planos', icon: '⭐' },
-    { id: 'avaliacao', label: 'Avalie o Site', icon: '📝' },
-    { id: 'seguranca', label: 'Segurança', icon: '🔒' },
-    { id: 'preferencias', label: 'Preferências', icon: '⚙️' },
-    { id: 'sistema', label: 'Sistema', icon: '💻' }
+    { id: 'perfil', label: 'Perfil do Usuário', icon: usuarioIcon },
+    { id: 'fazenda', label: 'Dados da Fazenda', icon: homeIcon },
+    { id: 'planos', label: 'Planos', icon: planosIcon },
+    { id: 'avaliacao', label: 'Avalie o Site', icon: cadastroIcon },
+    { id: 'seguranca', label: 'Segurança', icon: segurancaIcon },
+    { id: 'preferencias', label: 'Preferências', icon: configuracoesIcon },
+    { id: 'sistema', label: 'Sistema', icon: sistemaIcon }
   ];
 
   if (loading) {
@@ -390,73 +424,78 @@ const Configuracoes = () => {
     );
   }
 
-  const planoAtual = user?.plano || 'basico';
+  const planoAtual = localStorage.getItem('userPlano') || 'basico';
   const planoAtualNome = planos[planoAtual.toUpperCase()]?.nome || 'Plano Básico';
   const limitesAtuais = planos[planoAtual.toUpperCase()]?.limites || planos.BASICO.limites;
-
-  // Verificar uso atual
-  const animaisAtuais = JSON.parse(localStorage.getItem('animais') || '[]').length;
-  const lotesAtuais = JSON.parse(localStorage.getItem('lotes') || '[]').length;
-  const funcionariosAtuais = JSON.parse(localStorage.getItem('funcionarios') || '[]').length;
-
-  const renderEstrelas = (nota, readonly = false, onChange = null) => {
-    return (
-      <div className="estrelas-container">
-        {[1, 2, 3, 4, 5].map(star => (
-          <span
-            key={star}
-            className={`estrela ${star <= nota ? 'active' : ''}`}
-            onClick={() => !readonly && onChange(star)}
-            style={{ cursor: readonly ? 'default' : 'pointer' }}
-          >
-            ★
-          </span>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <>
       <div className="welcome-section">
-        <h2>Configurações</h2>
+        <h2>
+          <img src={configuracoesIcon} alt="Configurações" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Configurações
+        </h2>
         <p>Gerencie as configurações do sistema</p>
       </div>
       
       <div className="page-content">
-        <div className="config-container">
-          {/* Sidebar de configurações */}
-          <div className="config-sidebar">
+        <div className="config-container" style={{ display: 'flex', gap: '20px' }}>
+          
+          <div className="config-sidebar" style={{ width: '250px', flexShrink: 0 }}>
             {sections.map(section => (
               <button
                 key={section.id}
                 className={`config-tab ${activeSection === section.id ? 'active' : ''}`}
                 onClick={() => setActiveSection(section.id)}
+                style={{
+                  width: '100%',
+                  padding: '12px 15px',
+                  marginBottom: '5px',
+                  textAlign: 'left',
+                  background: activeSection === section.id ? '#2D6A4F' : 'transparent',
+                  color: activeSection === section.id ? 'white' : '#333',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
               >
-                <span className="config-icon">{section.icon}</span>
-                <span className="config-label">{section.label}</span>
+                <img src={section.icon} alt={section.label} className="icon icon-sm" style={{ width: '20px', height: '20px' }} />
+                <span>{section.label}</span>
               </button>
             ))}
           </div>
           
-          {/* Conteúdo das configurações */}
-          <div className="config-content">
-            {/* Perfil do Usuário */}
+          <div className="config-content" style={{ flex: 1 }}>
+            
             {activeSection === 'perfil' && (
               <div className="config-section">
-                <h3>Perfil do Usuário</h3>
-                <div className="form-grid">
+                <h3>
+                  <img src={usuarioIcon} alt="Perfil" className="icon icon-sm" style={{ marginRight: '8px' }} />
+                  Perfil do Usuário
+                </h3>
+                <p style={{ color: '#666', marginBottom: '15px', fontSize: '14px' }}>
+                  Estas informações foram preenchidas no seu cadastro e podem ser alteradas aqui.
+                </p>
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
                   <div className="form-group">
                     <label>Nome Completo</label>
                     <input type="text" name="nome" value={userData.nome} onChange={handleUserChange} />
                   </div>
                   <div className="form-group">
                     <label>Email</label>
-                    <input type="email" name="email" value={userData.email} onChange={handleUserChange} />
+                    <input type="email" name="email" value={userData.email} disabled />
+                    <small style={{ color: '#666' }}>O email não pode ser alterado</small>
                   </div>
                   <div className="form-group">
                     <label>Telefone</label>
                     <input type="tel" name="telefone" value={userData.telefone} onChange={handleUserChange} placeholder="(11) 99999-9999" />
+                  </div>
+                  <div className="form-group">
+                    <label>Fazenda</label>
+                    <input type="text" name="fazenda" value={userData.fazenda} onChange={handleUserChange} />
                   </div>
                   <div className="form-group">
                     <label>Cargo</label>
@@ -470,11 +509,16 @@ const Configuracoes = () => {
               </div>
             )}
             
-            {/* Dados da Fazenda */}
             {activeSection === 'fazenda' && (
               <div className="config-section">
-                <h3>Dados da Fazenda</h3>
-                <div className="form-grid">
+                <h3>
+                  <img src={homeIcon} alt="Fazenda" className="icon icon-sm" style={{ marginRight: '8px' }} />
+                  Dados da Fazenda
+                </h3>
+                <p style={{ color: '#666', marginBottom: '15px', fontSize: '14px' }}>
+                  Estas informações foram preenchidas no seu cadastro e podem ser alteradas aqui.
+                </p>
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
                   <div className="form-group">
                     <label>Nome da Fazenda</label>
                     <input type="text" name="nome" value={farmData.nome} onChange={handleFarmChange} />
@@ -496,39 +540,35 @@ const Configuracoes = () => {
                     <input type="text" name="cep" value={farmData.cep} onChange={handleFarmChange} />
                   </div>
                   <div className="form-group">
-                    <label>Telefone</label>
+                    <label>Telefone da Fazenda</label>
                     <input type="tel" name="telefone" value={farmData.telefone} onChange={handleFarmChange} />
                   </div>
                   <div className="form-group">
-                    <label>Email</label>
+                    <label>Email da Fazenda</label>
                     <input type="email" name="email" value={farmData.email} onChange={handleFarmChange} />
                   </div>
                 </div>
               </div>
             )}
             
-            {/* Planos */}
             {activeSection === 'planos' && (
               <div className="config-section">
-                <h3>Planos e Assinatura</h3>
+                <h3>
+                  <img src={planosIcon} alt="Planos" className="icon icon-sm" style={{ marginRight: '8px' }} />
+                  Planos e Assinatura
+                </h3>
                 
-                <div className="plano-atual">
-                  <div className="plano-atual-info">
-                    <span className="plano-atual-label">Plano Atual:</span>
-                    <span className="plano-atual-nome">{planoAtualNome}</span>
+                <div className="plano-atual" style={{ marginBottom: '20px', padding: '15px', background: '#e8f4f8', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold' }}>Plano Atual:</span>
+                    <span style={{ color: '#2D6A4F', fontWeight: 'bold' }}>{planoAtualNome}</span>
                   </div>
-                  <div className="plano-limites">
-                    <p>Seus limites atuais:</p>
-                    <ul>
-                      <li className={animaisAtuais > limitesAtuais.maxAnimais ? 'limite-atingido' : ''}>
-                        {animaisAtuais > limitesAtuais.maxAnimais ? '⚠️' : '✓'} Até {limitesAtuais.maxAnimais} animais (atual: {animaisAtuais})
-                      </li>
-                      <li className={lotesAtuais > limitesAtuais.maxLotes ? 'limite-atingido' : ''}>
-                        {lotesAtuais > limitesAtuais.maxLotes ? '⚠️' : '✓'} Até {limitesAtuais.maxLotes} lotes (atual: {lotesAtuais})
-                      </li>
-                      <li className={funcionariosAtuais > limitesAtuais.maxFuncionarios ? 'limite-atingido' : ''}>
-                        {funcionariosAtuais > limitesAtuais.maxFuncionarios ? '⚠️' : '✓'} Até {limitesAtuais.maxFuncionarios} funcionários (atual: {funcionariosAtuais})
-                      </li>
+                  <div style={{ marginTop: '10px' }}>
+                    <p style={{ fontWeight: 'bold' }}>Seus limites atuais:</p>
+                    <ul style={{ listStyle: 'none', padding: 0 }}>
+                      <li>{stats.animais > limitesAtuais.maxAnimais ? '⚠️' : '✓'} Até {limitesAtuais.maxAnimais} animais (atual: {stats.animais})</li>
+                      <li>{stats.lotes > limitesAtuais.maxLotes ? '⚠️' : '✓'} Até {limitesAtuais.maxLotes} lotes (atual: {stats.lotes})</li>
+                      <li>{stats.funcionarios > limitesAtuais.maxFuncionarios ? '⚠️' : '✓'} Até {limitesAtuais.maxFuncionarios} funcionários (atual: {stats.funcionarios})</li>
                       <li>✓ Até {limitesAtuais.maxVacinas} vacinas</li>
                       <li>✓ Até {limitesAtuais.maxPesagens} pesagens</li>
                       <li>✓ Até {limitesAtuais.maxEstoque} itens no estoque</li>
@@ -536,34 +576,34 @@ const Configuracoes = () => {
                   </div>
                 </div>
                 
-                <div className="planos-container-config">
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                   {Object.values(planos).map(plano => (
-                    <div key={plano.id} className={`plano-card-config ${planoAtual === plano.id ? 'current' : ''}`}>
-                      {planoAtual === plano.id && <div className="plano-badge-config">Atual</div>}
-                      <div className="plano-header-config">
+                    <div key={plano.id} style={{
+                      flex: 1,
+                      minWidth: '250px',
+                      border: planoAtual === plano.id ? '2px solid #2D6A4F' : '1px solid #ddd',
+                      borderRadius: '10px',
+                      padding: '15px',
+                      position: 'relative'
+                    }}>
+                      {planoAtual === plano.id && (
+                        <div style={{ position: 'absolute', top: '-10px', right: '10px', background: '#2D6A4F', color: 'white', padding: '2px 10px', borderRadius: '20px', fontSize: '12px' }}>Atual</div>
+                      )}
+                      <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                         <h4>{plano.nome}</h4>
-                        <div className="plano-preco-config">
-                          R$ {plano.preco.toFixed(2)}
-                          <span>/mês</span>
-                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>R$ {plano.preco.toFixed(2)}<span style={{ fontSize: '12px', fontWeight: 'normal' }}>/mês</span></div>
                       </div>
-                      <div className="plano-recursos-config">
+                      <div style={{ marginBottom: '15px' }}>
                         {plano.recursos.map((recurso, index) => (
-                          <div key={index} className="recurso-item-config">{recurso}</div>
+                          <div key={index} style={{ marginBottom: '5px', fontSize: '13px' }}>{recurso}</div>
                         ))}
                       </div>
                       {planoAtual !== plano.id ? (
-                        <button 
-                          className="plano-select-btn-config"
-                          onClick={() => handleUpgrade(plano.id)}
-                          disabled={upgrading}
-                        >
+                        <button onClick={() => handleUpgrade(plano.id)} disabled={upgrading} style={{ width: '100%', padding: '10px', background: '#2D6A4F', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                           {upgrading ? 'Processando...' : `Upgrade para ${plano.nome}`}
                         </button>
                       ) : (
-                        <button className="plano-select-btn-config current" disabled>
-                          Plano Atual
-                        </button>
+                        <button disabled style={{ width: '100%', padding: '10px', background: '#2ecc71', color: 'white', border: 'none', borderRadius: '6px' }}>Plano Atual</button>
                       )}
                     </div>
                   ))}
@@ -571,34 +611,31 @@ const Configuracoes = () => {
               </div>
             )}
             
-            {/* Avaliação do Site */}
             {activeSection === 'avaliacao' && (
-              <div className="config-section avaliacao-section">
-                <h3>Avalie o BULLTECH</h3>
+              <div className="config-section">
+                <h3>
+                  <img src={cadastroIcon} alt="Avaliação" className="icon icon-sm" style={{ marginRight: '8px' }} />
+                  Avalie o BULLTECH
+                </h3>
                 
-                {/* Média geral do site */}
                 {avaliacoesExistentes.length > 0 && (
-                  <div className="media-geral">
-                    <div className="media-geral-titulo">Média geral do sistema</div>
-                    <div className="media-geral-nota">
-                      <span className="media-nota">{mediaNotas.toFixed(1)}</span>
-                      <span className="media-estrelas">{renderEstrelas(Math.round(mediaNotas), true)}</span>
+                  <div style={{ marginBottom: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '10px', textAlign: 'center' }}>
+                    <div style={{ fontWeight: 'bold' }}>Média geral do sistema</div>
+                    <div>
+                      <span style={{ fontSize: '28px', fontWeight: 'bold' }}>{mediaNotas.toFixed(1)}</span>
+                      <span>{renderEstrelas(Math.round(mediaNotas), true)}</span>
                     </div>
-                    <div className="media-geral-total">
-                      Baseado em {avaliacoesExistentes.length} avaliação(ões)
-                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>Baseado em {avaliacoesExistentes.length} avaliação(ões)</div>
                   </div>
                 )}
                 
                 {!avaliacao.enviada ? (
-                  <div className="avaliacao-form">
-                    
-                    
-                    <div className="form-group">
-                      <label>Qual sua nota para o BULLTECH? *</label>
-                      <div className="nota-input">
+                  <div>
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Qual sua nota para o BULLTECH? *</label>
+                      <div>
                         {renderEstrelas(avaliacao.nota, false, (nota) => handleAvaliacaoChange('nota', nota))}
-                        <span className="nota-texto">
+                        <span style={{ marginLeft: '10px' }}>
                           {avaliacao.nota === 1 && 'Muito Ruim'}
                           {avaliacao.nota === 2 && 'Ruim'}
                           {avaliacao.nota === 3 && 'Regular'}
@@ -608,84 +645,52 @@ const Configuracoes = () => {
                       </div>
                     </div>
                     
-                    <div className="form-group">
-                      <label>O que você achou do sistema? *</label>
-                      <textarea
-                        rows="4"
-                        value={avaliacao.comentario}
-                        onChange={(e) => handleAvaliacaoChange('comentario', e.target.value)}
-                        placeholder="Conte-nos sobre sua experiência com o BULLTECH. O que mais gostou? O que poderia melhorar?"
-                      />
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>O que você achou do sistema? *</label>
+                      <textarea rows="4" value={avaliacao.comentario} onChange={(e) => handleAvaliacaoChange('comentario', e.target.value)} placeholder="Conte-nos sobre sua experiência com o BULLTECH..." />
                     </div>
                     
-                    <div className="form-group">
-                      <label>Você recomendaria o BULLTECH para outros produtores?</label>
-                      <div className="recomendacao-opcoes">
-                        <label className="radio-label">
-                          <input
-                            type="radio"
-                            name="recomendacao"
-                            value="sim"
-                            checked={avaliacao.recomendacao === 'sim'}
-                            onChange={(e) => handleAvaliacaoChange('recomendacao', e.target.value)}
-                          />
-                          <span>Sim, definitivamente</span>
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Você recomendaria o BULLTECH?</label>
+                      <div style={{ display: 'flex', gap: '15px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <input type="radio" name="recomendacao" value="sim" checked={avaliacao.recomendacao === 'sim'} onChange={(e) => handleAvaliacaoChange('recomendacao', e.target.value)} />
+                          <span>Sim</span>
                         </label>
-                        <label className="radio-label">
-                          <input
-                            type="radio"
-                            name="recomendacao"
-                            value="talvez"
-                            checked={avaliacao.recomendacao === 'talvez'}
-                            onChange={(e) => handleAvaliacaoChange('recomendacao', e.target.value)}
-                          />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <input type="radio" name="recomendacao" value="talvez" checked={avaliacao.recomendacao === 'talvez'} onChange={(e) => handleAvaliacaoChange('recomendacao', e.target.value)} />
                           <span>Talvez</span>
                         </label>
-                        <label className="radio-label">
-                          <input
-                            type="radio"
-                            name="recomendacao"
-                            value="nao"
-                            checked={avaliacao.recomendacao === 'nao'}
-                            onChange={(e) => handleAvaliacaoChange('recomendacao', e.target.value)}
-                          />
-                          <span>Não recomendaria</span>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <input type="radio" name="recomendacao" value="nao" checked={avaliacao.recomendacao === 'nao'} onChange={(e) => handleAvaliacaoChange('recomendacao', e.target.value)} />
+                          <span>Não</span>
                         </label>
                       </div>
                     </div>
                     
-                    <button className="btn-avaliar" onClick={handleEnviarAvaliacao}>
-                      Enviar Avaliação
-                    </button>
+                    <button onClick={handleEnviarAvaliacao} style={{ padding: '10px 20px', background: '#2D6A4F', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Enviar Avaliação</button>
                   </div>
                 ) : (
-                  <div className="avaliacao-agradecimento">
-                    <div className="agradecimento-icon">🙏</div>
+                  <div style={{ textAlign: 'center', padding: '30px', background: '#e8f4f8', borderRadius: '10px' }}>
+                    <div style={{ fontSize: '48px' }}>🙏</div>
                     <h4>Obrigado pela sua avaliação!</h4>
                     <p>Sua opinião nos ajuda a melhorar cada vez mais o BULLTECH.</p>
-                    <div className="avaliacao-enviada">
-                      <div className="avaliacao-nota-enviada">
-                        Sua nota: {renderEstrelas(avaliacao.nota, true)}
-                      </div>
-                      <div className="avaliacao-comentario-enviado">
-                        <strong>Seu comentário:</strong>
-                        <p>"{avaliacao.comentario}"</p>
-                      </div>
+                    <div>
+                      <div>Sua nota: {renderEstrelas(avaliacao.nota, true)}</div>
+                      <div><strong>Seu comentário:</strong> "{avaliacao.comentario}"</div>
                     </div>
                   </div>
                 )}
               </div>
             )}
             
-            {/* Segurança */}
             {activeSection === 'seguranca' && (
               <div className="config-section">
-                <h3>Alterar Senha</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Senha Atual</label>
-                    <input type="password" name="senhaAtual" value={securityData.senhaAtual} onChange={handleSecurityChange} />
-                  </div>
+                <h3>
+                  <img src={segurancaIcon} alt="Segurança" className="icon icon-sm" style={{ marginRight: '8px' }} />
+                  Alterar Senha
+                </h3>
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
                   <div className="form-group">
                     <label>Nova Senha</label>
                     <input type="password" name="novaSenha" value={securityData.novaSenha} onChange={handleSecurityChange} />
@@ -695,17 +700,19 @@ const Configuracoes = () => {
                     <input type="password" name="confirmarSenha" value={securityData.confirmarSenha} onChange={handleSecurityChange} />
                   </div>
                 </div>
-                <button className="btn-save" onClick={handleChangePassword} disabled={saving}>
+                <button onClick={handleChangePassword} disabled={saving} style={{ padding: '10px 20px', background: '#2D6A4F', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                   {saving ? 'Salvando...' : 'Alterar Senha'}
                 </button>
               </div>
             )}
             
-            {/* Preferências */}
             {activeSection === 'preferencias' && (
               <div className="config-section">
-                <h3>Preferências do Sistema</h3>
-                <div className="form-grid">
+                <h3>
+                  <img src={configuracoesIcon} alt="Preferências" className="icon icon-sm" style={{ marginRight: '8px' }} />
+                  Preferências do Sistema
+                </h3>
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
                   <div className="form-group">
                     <label>Tema</label>
                     <select name="tema" value={preferences.tema} onChange={handlePreferencesChange}>
@@ -729,8 +736,8 @@ const Configuracoes = () => {
                       <option value="lista">Lista</option>
                     </select>
                   </div>
-                  <div className="form-group checkbox">
-                    <label>
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <input type="checkbox" name="notificacoes" checked={preferences.notificacoes} onChange={handlePreferencesChange} />
                       Receber notificações por email
                     </label>
@@ -739,55 +746,56 @@ const Configuracoes = () => {
               </div>
             )}
             
-            {/* Sistema */}
             {activeSection === 'sistema' && (
               <div className="config-section">
-                <h3>Informações do Sistema</h3>
-                <div className="info-box">
-                  <div className="info-row">
-                    <span className="info-label">Versão do Sistema:</span>
-                    <span className="info-value">1.0.0</span>
+                <h3>
+                  <img src={sistemaIcon} alt="Sistema" className="icon icon-sm" style={{ marginRight: '8px' }} />
+                  Informações do Sistema
+                </h3>
+                <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '10px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', padding: '5px 0', borderBottom: '1px solid #eee' }}>
+                    <span style={{ fontWeight: 'bold' }}>Versão do Sistema:</span><span>2.0.0</span>
                   </div>
-                  <div className="info-row">
-                    <span className="info-label">Data da Última Atualização:</span>
-                    <span className="info-value">15/03/2026</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', padding: '5px 0', borderBottom: '1px solid #eee' }}>
+                    <span style={{ fontWeight: 'bold' }}>Total de Animais:</span><span>{stats.animais}</span>
                   </div>
-                  <div className="info-row">
-                    <span className="info-label">Total de Animais:</span>
-                    <span className="info-value">{animaisAtuais}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', padding: '5px 0', borderBottom: '1px solid #eee' }}>
+                    <span style={{ fontWeight: 'bold' }}>Total de Lotes:</span><span>{stats.lotes}</span>
                   </div>
-                  <div className="info-row">
-                    <span className="info-label">Total de Lotes:</span>
-                    <span className="info-value">{lotesAtuais}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', padding: '5px 0', borderBottom: '1px solid #eee' }}>
+                    <span style={{ fontWeight: 'bold' }}>Total de Funcionários:</span><span>{stats.funcionarios}</span>
                   </div>
-                  <div className="info-row">
-                    <span className="info-label">Total de Vacinas:</span>
-                    <span className="info-value">{JSON.parse(localStorage.getItem('vacinas') || '[]').length}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', padding: '5px 0', borderBottom: '1px solid #eee' }}>
+                    <span style={{ fontWeight: 'bold' }}>Total de Vacinas:</span><span>{stats.vacinas}</span>
                   </div>
-                  <div className="info-row">
-                    <span className="info-label">Espaço Utilizado:</span>
-                    <span className="info-value">~ 2.5 MB</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', padding: '5px 0', borderBottom: '1px solid #eee' }}>
+                    <span style={{ fontWeight: 'bold' }}>Total de Pesagens:</span><span>{stats.pesagens}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', padding: '5px 0' }}>
+                    <span style={{ fontWeight: 'bold' }}>Total em Estoque:</span><span>{stats.estoque}</span>
                   </div>
                 </div>
                 
-                <div className="danger-zone">
-                  <h4>Zona de Perigo</h4>
-                  <button className="btn-danger" onClick={() => {
-                    if (window.confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita!')) {
+                <div style={{ borderTop: '2px solid #e74c3c', paddingTop: '20px' }}>
+                  <h4 style={{ color: '#e74c3c', marginBottom: '10px' }}>⚠️ Zona de Perigo</h4>
+                  <button onClick={() => {
+                    if (window.confirm('Tem certeza que deseja limpar todos os dados do cache? Esta ação não pode ser desfeita!')) {
                       localStorage.clear();
-                      window.location.href = '/';
+                      window.location.href = '/login';
                     }
-                  }}>
-                    Limpar Todos os Dados
+                  }} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                    Limpar Dados do Cache Local
                   </button>
+                  <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+                    Isso limpará apenas os dados do cache local. Seus dados no Supabase permanecerão intactos.
+                  </p>
                 </div>
               </div>
             )}
             
-            {/* Botão Salvar (exceto nas abas de segurança, planos, avaliação e sistema) */}
             {activeSection !== 'seguranca' && activeSection !== 'planos' && activeSection !== 'avaliacao' && activeSection !== 'sistema' && (
-              <div className="form-actions">
-                <button className="btn-save" onClick={handleSaveProfile} disabled={saving}>
+              <div style={{ marginTop: '20px' }}>
+                <button onClick={handleSaveProfile} disabled={saving} style={{ padding: '10px 20px', background: '#2ecc71', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
                   {saving ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>

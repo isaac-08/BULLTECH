@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { funcionariosAPI } from '../../services/api';
 
 const VisualizarFuncionario = () => {
   const navigate = useNavigate();
@@ -8,15 +9,21 @@ const VisualizarFuncionario = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const funcionarios = JSON.parse(localStorage.getItem('funcionarios') || '[]');
-    const found = funcionarios.find(f => f.id === parseInt(id));
-    if (found) {
-      setFuncionario(found);
-    } else {
+    carregarFuncionario();
+  }, [id]);
+
+  const carregarFuncionario = async () => {
+    try {
+      setLoading(true);
+      const data = await funcionariosAPI.getOne(id);
+      setFuncionario(data);
+    } catch (error) {
+      console.error('Erro ao carregar funcionário:', error);
       navigate('/funcionarios');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id, navigate]);
+  };
 
   if (loading) {
     return (
@@ -35,6 +42,14 @@ const VisualizarFuncionario = () => {
   if (!funcionario) {
     return null;
   }
+
+  const niveisAcessoLabel = {
+    ADMIN: 'Administrador',
+    VETERINARIO: 'Veterinário',
+    TRATADOR: 'Tratador',
+    SECRETARIA: 'Secretaria',
+    VISUALIZADOR: 'Visualizador'
+  };
 
   return (
     <>
@@ -57,23 +72,18 @@ const VisualizarFuncionario = () => {
             </div>
             
             <div className="form-group">
-              <label>CPF</label>
-              <p className="view-value">{funcionario.cpf}</p>
+              <label>Email</label>
+              <p className="view-value">{funcionario.email}</p>
             </div>
             
             <div className="form-group">
-              <label>Data de Nascimento</label>
-              <p className="view-value">{funcionario.dataNascimento || '-'}</p>
+              <label>CPF</label>
+              <p className="view-value">{funcionario.cpf || '-'}</p>
             </div>
             
             <div className="form-group">
               <label>Telefone</label>
-              <p className="view-value">{funcionario.telefone}</p>
-            </div>
-            
-            <div className="form-group">
-              <label>E-mail</label>
-              <p className="view-value">{funcionario.email || '-'}</p>
+              <p className="view-value">{funcionario.telefone || '-'}</p>
             </div>
             
             <div className="form-group">
@@ -82,13 +92,18 @@ const VisualizarFuncionario = () => {
             </div>
             
             <div className="form-group">
+              <label>Nível de Acesso</label>
+              <p className="view-value">{niveisAcessoLabel[funcionario.nivel_acesso] || funcionario.nivel_acesso}</p>
+            </div>
+            
+            <div className="form-group">
               <label>Salário</label>
-              <p className="view-value">R$ {funcionario.salario?.toFixed(2)}</p>
+              <p className="view-value">R$ {(funcionario.salario || 0).toFixed(2)}</p>
             </div>
             
             <div className="form-group">
               <label>Data de Admissão</label>
-              <p className="view-value">{funcionario.dataAdmissao}</p>
+              <p className="view-value">{funcionario.data_admissao ? new Date(funcionario.data_admissao).toLocaleDateString('pt-BR') : '-'}</p>
             </div>
             
             <div className="form-group">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
@@ -10,47 +11,77 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const admin = users.find(u => u.email === email && u.senha === senha);
-
-      if (admin) {
+    try {
+      // VERIFICAÇÃO ESPECIAL PARA ADMIN
+      if (email === 'admin@gmail.com' && senha === 'admadm') {
+        // Salvar admin no localStorage
         localStorage.setItem('currentUser', JSON.stringify({
-          id: admin.id,
-          nome: admin.nome,
-          email: admin.email,
-          fazenda: admin.fazenda,
-          tipo: 'admin'
+          id: 'admin',
+          nome: 'Administrador',
+          email: 'admin@gmail.com',
+          fazenda: 'BULLTECH System',
+          tipo: 'admin',
+          isAdmin: true
         }));
-        navigate('/dashboard');
+        
         setLoading(false);
+        navigate('/admin');
         return;
       }
 
-      const funcionarios = JSON.parse(localStorage.getItem('funcionarios') || '[]');
-      const funcionario = funcionarios.find(f => f.email === email && f.senha === senha && f.status === 'Ativo');
+      // Login normal para usuários comuns
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: senha,
+      });
 
-      if (funcionario) {
-        localStorage.setItem('currentUser', JSON.stringify({
-          id: funcionario.id,
-          nome: funcionario.nome,
-          email: funcionario.email,
-          cargo: funcionario.cargo,
-          tipo: 'funcionario'
-        }));
-        navigate('/dashboard');
-        setLoading(false);
-        return;
+      if (signInError) {
+        console.error('Erro no signIn:', signInError);
+        throw signInError;
       }
 
+      if (data?.user) {
+        // Buscar o perfil do usuário na tabela 'usuarios'
+        const { data: profile, error: profileError } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('auth_id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Erro ao buscar perfil:', profileError);
+        }
+
+        // Verificar se o usuário é admin pelo perfil
+        const isAdmin = profile?.tipo === 'admin' || profile?.email === 'admin@gmail.com';
+
+        // Salvar no localStorage
+        localStorage.setItem('currentUser', JSON.stringify({
+          id: profile?.id || data.user.id,
+          nome: profile?.nome || data.user.email,
+          email: data.user.email,
+          fazenda: profile?.fazenda || '',
+          tipo: isAdmin ? 'admin' : (profile?.tipo || 'usuario'),
+          isAdmin: isAdmin
+        }));
+        
+        if (isAdmin) {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
+      }
+    } catch (err) {
+      console.error('Erro no login:', err);
       setError('Email ou senha inválidos');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   return (

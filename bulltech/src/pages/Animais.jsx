@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { animaisAPI } from '../services/api';
 import { podeAdicionar, getPlanoAtual, getUsoAtual } from '../utils/limites';
-import { syncLotesStats } from '../utils/syncData';
 import iconsAcoes from '../assets/icons/acoes';
 
 const Animais = () => {
@@ -12,49 +12,48 @@ const Animais = () => {
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [sexoFilter, setSexoFilter] = useState('Todos');
   const [plano, setPlano] = useState(null);
-  const [uso, setUso] = useState({});
   const [atingiuLimite, setAtingiuLimite] = useState(false);
+
+  // Pegando os ícones de ações
+  const { editar, visu, excluir } = iconsAcoes;
 
   useEffect(() => {
     const planoAtual = getPlanoAtual();
-    const usoAtual = getUsoAtual();
     setPlano(planoAtual);
-    setUso(usoAtual);
-    setAtingiuLimite(usoAtual.animais >= planoAtual.limites.animais);
     carregarAnimais();
   }, []);
 
-  const carregarAnimais = () => {
-  const storedAnimais = localStorage.getItem('animais');
-  if (storedAnimais) {
-    setAnimais(JSON.parse(storedAnimais));
-  } else {
-    // Começa com array vazio - SEM ANIMAIS PRÉ-CARREGADOS
-    setAnimais([]);
-    localStorage.setItem('animais', JSON.stringify([]));
-  }
-  setLoading(false);
-};
-
-  const handleDelete = (id) => {
-    if (window.confirm('Tem certeza que deseja excluir este animal?')) {
-      const animal = animais.find(a => a.id === id);
-      const loteAnimal = animal?.lote;
-      
-      const newAnimais = animais.filter(animal => animal.id !== id);
-      setAnimais(newAnimais);
-      localStorage.setItem('animais', JSON.stringify(newAnimais));
-      
-      if (loteAnimal) {
-        syncLotesStats();
+  const carregarAnimais = async () => {
+    try {
+      setLoading(true);
+      const data = await animaisAPI.getAll();
+      setAnimais(data);
+      if (plano) {
+        setAtingiuLimite(data.length >= plano.limites.animais);
       }
-      
-      alert('Animal excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao carregar animais:', error);
+      alert('Erro ao carregar animais');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Tem certeza que deseja excluir este animal?')) {
+      try {
+        await animaisAPI.delete(id);
+        await carregarAnimais();
+        alert('Animal excluído com sucesso!');
+      } catch (error) {
+        console.error('Erro ao excluir animal:', error);
+        alert('Erro ao excluir animal');
+      }
     }
   };
 
   const handleNovoAnimal = () => {
-    const verificacao = podeAdicionar('animais', uso.animais);
+    const verificacao = podeAdicionar('animais', animais.length);
     if (!verificacao.permitido) {
       alert(verificacao.mensagem);
       return;
@@ -97,7 +96,6 @@ const Animais = () => {
       </div>
       
       <div className="page-content">
-        {/* Alerta de limite */}
         {atingiuLimite && (
           <div className="limite-alerta critico">
             <div className="limite-info">
@@ -111,7 +109,6 @@ const Animais = () => {
           </div>
         )}
         
-        {/* Cards separados */}
         <div className="stats-cards-animais">
           <div className="stat-card-animais">
             <h3>Total de Animais</h3>
@@ -138,7 +135,6 @@ const Animais = () => {
           </div>
         </div>
 
-        {/* Botão Novo Animal */}
         <button 
           className="btn-novo" 
           onClick={handleNovoAnimal}
@@ -148,7 +144,6 @@ const Animais = () => {
           + Novo Animal
         </button>
 
-        {/* Filtros */}
         <div className="filters-bar-animais">
           <div className="filters-row">
             <div className="filter-group">
@@ -179,7 +174,6 @@ const Animais = () => {
           </div>
         </div>
 
-        {/* Tabela */}
         <div className="table-container-animais">
           <table className="animais-table">
             <thead>
@@ -204,13 +198,13 @@ const Animais = () => {
                   <td>{animal.lote || '-'}</td>
                   <td className="actions-cell">
                     <button className="action-btn edit" onClick={() => navigate(`/animais/editar/${animal.id}`)}>
-                      <img src={iconsAcoes.editar} alt="Editar" className="action-icon" />
+                      <img src={editar} alt="Editar" className="icon icon-sm icon-hover" />
                     </button>
                     <button className="action-btn view" onClick={() => navigate(`/animais/visualizar/${animal.id}`)}>
-                      <img src={iconsAcoes.visu} alt="Visualizar" className="action-icon" />
+                      <img src={visu} alt="Visualizar" className="icon icon-sm icon-hover" />
                     </button>
                     <button className="action-btn delete" onClick={() => handleDelete(animal.id)}>
-                      <img src={iconsAcoes.excluir} alt="Excluir" className="action-icon" />
+                      <img src={excluir} alt="Excluir" className="icon icon-sm icon-hover" />
                     </button>
                   </td>
                 </tr>

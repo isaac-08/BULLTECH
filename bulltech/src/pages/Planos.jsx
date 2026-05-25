@@ -4,7 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import bannerPlanos from '../assets/banner_planos.png';
 
-// Ícones (você pode substituir pelos seus ícones)
+// Ícones
 import iconeBasico from '../assets/icons/basico.png';
 import iconeProfissional from '../assets/icons/profissional.png';
 import iconeEmpresarial from '../assets/icons/empresarial.png';
@@ -22,22 +22,14 @@ const Planos = () => {
       precoMensal: 99.90,
       precoAnual: 999.00,
       icone: iconeBasico,
-      limites: {
-        maxAnimais: 100,
-        maxLotes: 5,
-        maxFuncionarios: 3,
-        maxVacinas: 50,
-        maxPesagens: 200,
-        maxEstoque: 30,
-        maxDietas: 10,
-        maxReproducoes: 50
-      },
       recursos: [
-        'Até 100 animais',
-        'Até 5 lotes',
-        'Até 3 funcionários',
-        'Relatórios básicos',
-        'Suporte por email'
+        '✓ Até 300 animais',
+        '✓ Até 10 lotes',
+        '✓ Até 10 funcionários',
+        '✓ Vacinas ilimitadas',
+        '✓ Pesagens ilimitadas',
+        '✓ Relatórios básicos',
+        '✓ Suporte por email'
       ]
     },
     PROFISSIONAL: {
@@ -46,24 +38,16 @@ const Planos = () => {
       precoMensal: 199.90,
       precoAnual: 1999.00,
       icone: iconeProfissional,
-      limites: {
-        maxAnimais: 400,
-        maxLotes: 15,
-        maxFuncionarios: 10,
-        maxVacinas: 200,
-        maxPesagens: 1000,
-        maxEstoque: 100,
-        maxDietas: 50,
-        maxReproducoes: 200
-      },
       recursos: [
-        'Até 400 animais',
-        'Até 15 lotes',
-        'Até 10 funcionários',
-        'Relatórios básicos',
-        'Relatórios avançados',
-        'Suporte por email',
-        'Suporte WhatsApp'
+        '✓ Até 1000 animais',
+        '✓ Até 30 lotes',
+        '✓ Até 25 funcionários',
+        '✓ Vacinas ilimitadas',
+        '✓ Pesagens ilimitadas',
+        '✓ Relatórios básicos',
+        '✓ Relatórios avançados',
+        '✓ Suporte por email',
+        '✓ Suporte WhatsApp'
       ]
     },
     EMPRESARIAL: {
@@ -72,32 +56,23 @@ const Planos = () => {
       precoMensal: 399.90,
       precoAnual: 3999.00,
       icone: iconeEmpresarial,
-      limites: {
-        maxAnimais: 2000,
-        maxLotes: 100,
-        maxFuncionarios: 50,
-        maxVacinas: 1000,
-        maxPesagens: 10000,
-        maxEstoque: 500,
-        maxDietas: 200,
-        maxReproducoes: 1000
-      },
       recursos: [
-        'Até 2000 animais',
-        'Até 100 lotes',
-        'Até 50 funcionários',
-        'Relatórios básicos',
-        'Relatórios avançados',
-        'Relatórios personalizados',
-        'Suporte prioritário',
-        'API de acesso'
+        '✓ Animais ilimitados',
+        '✓ Lotes ilimitados',
+        '✓ Funcionários ilimitados',
+        '✓ Vacinas ilimitadas',
+        '✓ Pesagens ilimitadas',
+        '✓ Relatórios básicos',
+        '✓ Relatórios avançados',
+        '✓ Relatórios personalizados',
+        '✓ Suporte prioritário',
+        '✓ API de acesso'
       ]
     }
   };
 
   const handleContratar = (planoId) => {
     setPlanoSelecionado(planoId);
-    // Salvar plano selecionado no localStorage para o processo de checkout
     localStorage.setItem('planoSelecionado', JSON.stringify({
       id: planoId,
       nome: planos[planoId.toUpperCase()].nome,
@@ -173,19 +148,7 @@ const Planos = () => {
                     </div>
                   )}
                   
-                  <div className="plano-limites">
-                    <h4>Limites do plano:</h4>
-                    <ul>
-                      <li>✓ {plano.limites.maxAnimais} animais</li>
-                      <li>✓ {plano.limites.maxLotes} lotes</li>
-                      <li>✓ {plano.limites.maxFuncionarios} funcionários</li>
-                      <li>✓ {plano.limites.maxVacinas} vacinas</li>
-                      <li>✓ {plano.limites.maxPesagens} pesagens</li>
-                    </ul>
-                  </div>
-                  
                   <div className="plano-recursos">
-                    <h4>Recursos incluídos:</h4>
                     <ul>
                       {plano.recursos.map((recurso, idx) => (
                         <li key={idx}>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Foot from '../components/Foot';
 import iconsIndex from '../assets/icons/index';
 import banner from '../assets/banner_home.jpg';
 import fazendeiro from '../assets/icons/fazendeiro.jpg';
@@ -23,21 +23,27 @@ const Index = () => {
     {
       nome: "João Silva",
       cargo: "Produtor Rural",
-      texto: "Vai contar com Bulltech no Brasil. Aqui você pode encontrar informações sobre os produtos e serviços que oferecemos.",
+      texto: "A BULLTECH revolucionou a gestão da minha fazenda. Recomendo!",
       imagem: fazendeiro
     },
     {
       nome: "Maria Santos",
       cargo: "Administradora",
-      texto: "Para mais informações, contacte-nos. A plataforma revolucionou minha fazenda!",
+      texto: "Plataforma intuitiva e completa. Facilita muito o dia a dia.",
       imagem: adm
     },
     {
       nome: "Carlos Oliveira",
       cargo: "Veterinário",
-      texto: "Produtos e serviços exclusivos que facilitam o dia a dia na propriedade.",
+      texto: "Controle de vacinas e pesagens ficou muito mais eficiente.",
       imagem: veterinario
     }
+  ];
+
+  const planosDestaque = [
+    { nome: "Plano Básico", preco: "R$ 99,90", descricao: "Ideal para pequenos produtores" },
+    { nome: "Plano Profissional", preco: "R$ 199,90", descricao: "Mais popular" },
+    { nome: "Plano Empresarial", preco: "R$ 399,90", descricao: "Para grandes propriedades" }
   ];
 
   return (
@@ -68,6 +74,30 @@ const Index = () => {
           </div>
         </section>
 
+        {/* Chamariz para Planos */}
+        <section className="planos-chamada">
+          <div className="container">
+            <div className="chamada-content">
+              <h2>Planos para todos os tamanhos de fazenda</h2>
+              <p>Escolha o plano ideal para o seu negócio e comece a transformar sua gestão hoje mesmo</p>
+              
+              <div className="planos-mini-grid">
+                {planosDestaque.map((plano, index) => (
+                  <div key={index} className="plano-mini-card">
+                    <h3>{plano.nome}</h3>
+                    <div className="plano-mini-preco">{plano.preco}</div>
+                    <p className="plano-mini-descricao">{plano.descricao}</p>
+                  </div>
+                ))}
+              </div>
+              
+              <button className="btn-ver-planos" onClick={() => navigate('/plano')}>
+                Ver Todos os Planos →
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* CTA Banner */}
         <section className="cta-banner">
           <div className="container">
@@ -84,7 +114,7 @@ const Index = () => {
         {/* Depoimentos */}
         <section className="testimonials-section">
           <div className="container">
-            <h2 className="section-title">Testemunhos de quem confia na BULLTECH</h2>
+            <h2 className="section-title">Quem confia na BULLTECH</h2>
             <div className="testimonials-grid">
               {depoimentos.map((dep, index) => (
                 <div key={index} className="testimonial-card">
@@ -103,7 +133,7 @@ const Index = () => {
         </section>
       </main>
       
-      <Footer />
+      <Foot />
     </div>
   );
 };

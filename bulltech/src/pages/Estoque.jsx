@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { podeAdicionar, getPlanoAtual, getUsoAtual } from '../utils/limites';
-
+import { estoqueAPI } from '../services/api';
+import { podeAdicionar, getPlanoAtual } from '../utils/limites';
+import iconsAcoes from '../assets/icons/acoes';
+import estoqueIcon from '../assets/icons/estoque.png';
 
 const Estoque = () => {
   const navigate = useNavigate();
@@ -10,43 +12,47 @@ const Estoque = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('Todos');
   const [plano, setPlano] = useState(null);
-  const [uso, setUso] = useState({});
   const [atingiuLimite, setAtingiuLimite] = useState(false);
+
+  const { editar, visu, excluir } = iconsAcoes;
 
   useEffect(() => {
     const planoAtual = getPlanoAtual();
-    const usoAtual = getUsoAtual();
     setPlano(planoAtual);
-    setUso(usoAtual);
-    setAtingiuLimite(usoAtual.estoque >= planoAtual.limites.estoque);
-    carregarEstoque();
+    carregarEstoque(planoAtual);
   }, []);
 
-  const carregarEstoque = () => {
-    const storedProdutos = localStorage.getItem('estoque');
-    if (storedProdutos) {
-      setProdutos(JSON.parse(storedProdutos));
-    } else {
-      const initialProdutos = [
-        { id: 1, nome: 'Ração Premium', categoria: 'Alimentação', quantidade: 500, unidade: 'kg', precoUnitario: 2.50, dataValidade: '31/12/2025', fornecedor: 'Agropecuária Silva' }
-      ];
-      setProdutos(initialProdutos);
-      localStorage.setItem('estoque', JSON.stringify(initialProdutos));
+  const carregarEstoque = async (planoAtual = plano) => {
+    try {
+      setLoading(true);
+      const data = await estoqueAPI.getAll();
+      setProdutos(data || []);
+      if (planoAtual) {
+        setAtingiuLimite(data.length >= planoAtual.limites.estoque);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar estoque:', error);
+      alert('Erro ao carregar estoque');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
-      const newProdutos = produtos.filter(p => p.id !== id);
-      setProdutos(newProdutos);
-      localStorage.setItem('estoque', JSON.stringify(newProdutos));
-      alert('Produto excluído com sucesso!');
+      try {
+        await estoqueAPI.delete(id);
+        await carregarEstoque();
+        alert('Produto excluído com sucesso!');
+      } catch (error) {
+        console.error('Erro ao excluir produto:', error);
+        alert('Erro ao excluir produto');
+      }
     }
   };
 
   const handleNovoProduto = () => {
-    const verificacao = podeAdicionar('estoque', uso.estoque);
+    const verificacao = podeAdicionar('estoque', produtos.length);
     if (!verificacao.permitido) {
       alert(verificacao.mensagem);
       return;
@@ -62,10 +68,10 @@ const Estoque = () => {
   });
 
   const totalProdutos = produtos.length;
-  const totalQuantidade = produtos.reduce((acc, p) => acc + p.quantidade, 0);
-  const valorTotalEstoque = produtos.reduce((acc, p) => acc + (p.quantidade * p.precoUnitario), 0).toFixed(2);
+  const totalQuantidade = produtos.reduce((acc, p) => acc + (p.quantidade || 0), 0);
+  const valorTotalEstoque = produtos.reduce((acc, p) => acc + ((p.quantidade || 0) * (p.preco_unitario || 0)), 0).toFixed(2);
 
-  const categorias = ['Todos', ...new Set(produtos.map(p => p.categoria))];
+  const categorias = ['Todos', ...new Set(produtos.map(p => p.categoria).filter(Boolean))];
 
   if (loading) {
     return (
@@ -84,7 +90,10 @@ const Estoque = () => {
   return (
     <>
       <div className="welcome-section">
-        <h2>Estoque</h2>
+        <h2>
+          <img src={estoqueIcon} alt="Estoque" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Estoque
+        </h2>
         <p>Gerencie seus insumos, medicamentos e alimentos</p>
       </div>
       
@@ -166,23 +175,33 @@ const Estoque = () => {
             <tbody>
               {filteredProdutos.map((produto) => (
                 <tr key={produto.id}>
-                  <td>{produto.nome}</td>
+                  <td><strong>{produto.nome}</strong></td>
                   <td>{produto.categoria}</td>
                   <td className={produto.quantidade < 50 ? 'negative-gain' : ''}>{produto.quantidade}</td>
                   <td>{produto.unidade}</td>
-                  <td>R$ {produto.precoUnitario.toFixed(2)}</td>
-                  <td>R$ {(produto.quantidade * produto.precoUnitario).toFixed(2)}</td>
+                  <td>R$ {(produto.preco_unitario || 0).toFixed(2)}</td>
+                  <td>R$ {((produto.quantidade || 0) * (produto.preco_unitario || 0)).toFixed(2)}</td>
                   <td>{produto.fornecedor || '-'}</td>
                   <td className="actions-cell">
-                    <button className="action-btn edit" onClick={() => navigate(`/estoque/editar/${produto.id}`)}>✏️</button>
-                    <button className="action-btn view" onClick={() => navigate(`/estoque/visualizar/${produto.id}`)}>👁️</button>
-                    <button className="action-btn delete" onClick={() => handleDelete(produto.id)}>🗑️</button>
+                    <button className="action-btn edit" onClick={() => navigate(`/estoque/editar/${produto.id}`)}>
+                      <img src={editar} alt="Editar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn view" onClick={() => navigate(`/estoque/visualizar/${produto.id}`)}>
+                      <img src={visu} alt="Visualizar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn delete" onClick={() => handleDelete(produto.id)}>
+                      <img src={excluir} alt="Excluir" className="icon icon-sm icon-hover" />
+                    </button>
                   </td>
                 </tr>
               ))}
+              
               {filteredProdutos.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="empty-message">Nenhum produto encontrado</td>
+                  <td colSpan="8" className="empty-message" style={{ textAlign: 'center', padding: '40px' }}>
+                    <img src={estoqueIcon} alt="Estoque" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                    <br />Nenhum produto encontrado
+                  </td>
                 </tr>
               )}
             </tbody>

@@ -1,59 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { podeAdicionar, getPlanoAtual, getUsoAtual } from '../utils/limites';
-
+import { reproducoesAPI } from '../services/api';
+import { podeAdicionar, getPlanoAtual } from '../utils/limites';
+import iconsAcoes from '../assets/icons/acoes';
+import iconsDash from '../assets/icons/dash';
+import iconsRelat from '../assets/icons/relat';
 
 const Reproducao = () => {
   const navigate = useNavigate();
   const [reproducoes, setReproducoes] = useState([]);
-  const [animais, setAnimais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('Todos');
   const [resultadoFilter, setResultadoFilter] = useState('Todos');
   const [plano, setPlano] = useState(null);
-  const [uso, setUso] = useState({});
   const [atingiuLimite, setAtingiuLimite] = useState(false);
+
+  const { editar, visu, excluir } = iconsAcoes;
+  const { animais: iconAnimais } = iconsDash;
+  const { data: iconData, grafico: iconGrafico } = iconsRelat;
 
   useEffect(() => {
     const planoAtual = getPlanoAtual();
-    const usoAtual = getUsoAtual();
     setPlano(planoAtual);
-    setUso(usoAtual);
-    setAtingiuLimite(usoAtual.reproducoes >= planoAtual.limites.reproducoes);
-    carregarDados();
+    carregarReproducoes();
   }, []);
 
-  const carregarDados = () => {
-    const storedReproducoes = localStorage.getItem('reproducoes');
-    const storedAnimais = localStorage.getItem('animais');
-    
-    if (storedReproducoes) {
-      setReproducoes(JSON.parse(storedReproducoes));
-    } else {
-      const initialReproducoes = [];
-      setReproducoes(initialReproducoes);
-      localStorage.setItem('reproducoes', JSON.stringify(initialReproducoes));
+  const carregarReproducoes = async () => {
+    try {
+      setLoading(true);
+      const data = await reproducoesAPI.getAll();
+      setReproducoes(data);
+      if (plano) {
+        setAtingiuLimite(data.length >= plano.limites.reproducoes);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar reproduções:', error);
+      alert('Erro ao carregar reproduções');
+    } finally {
+      setLoading(false);
     }
-    
-    if (storedAnimais) {
-      setAnimais(JSON.parse(storedAnimais));
-    }
-    
-    setLoading(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
-      const newReproducoes = reproducoes.filter(r => r.id !== id);
-      setReproducoes(newReproducoes);
-      localStorage.setItem('reproducoes', JSON.stringify(newReproducoes));
-      alert('Registro excluído com sucesso!');
+      try {
+        await reproducoesAPI.delete(id);
+        await carregarReproducoes();
+        alert('Registro excluído com sucesso!');
+      } catch (error) {
+        console.error('Erro ao excluir registro:', error);
+        alert('Erro ao excluir registro');
+      }
     }
   };
 
   const handleNovoRegistro = () => {
-    const verificacao = podeAdicionar('reproducoes', uso.reproducoes);
+    const verificacao = podeAdicionar('reproducoes', reproducoes.length);
     if (!verificacao.permitido) {
       alert(verificacao.mensagem);
       return;
@@ -62,8 +65,8 @@ const Reproducao = () => {
   };
 
   const filteredReproducoes = reproducoes.filter(reg => {
-    const matchesSearch = reg.animalNome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          reg.animalBrinco?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = reg.animal_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          reg.animal_brinco?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTipo = tipoFilter === 'Todos' || reg.tipo === tipoFilter;
     const matchesResultado = resultadoFilter === 'Todos' || reg.resultado === resultadoFilter;
     return matchesSearch && matchesTipo && matchesResultado;
@@ -88,7 +91,10 @@ const Reproducao = () => {
   return (
     <>
       <div className="welcome-section">
-        <h2>Reprodução</h2>
+        <h2>
+          <img src={iconData} alt="Reprodução" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Reprodução
+        </h2>
         <p>Gerencie os eventos reprodutivos do seu rebanho</p>
       </div>
       
@@ -108,7 +114,10 @@ const Reproducao = () => {
         
         <div className="stats-cards-animais">
           <div className="stat-card-animais">
-            <h3>Total de Eventos</h3>
+            <h3>
+              <img src={iconGrafico} alt="Eventos" className="icon icon-xs" style={{ marginRight: '5px' }} />
+              Total de Eventos
+            </h3>
             <div className="stat-number">{totalEventos}</div>
             <div className="stat-detail">Limite: {plano?.limites.reproducoes}</div>
           </div>
@@ -170,25 +179,37 @@ const Reproducao = () => {
             <tbody>
               {filteredReproducoes.map((reg) => (
                 <tr key={reg.id}>
-                  <td>{reg.animalNome}</td>
+                  <td>
+                    <img src={iconAnimais} alt="Animal" className="icon icon-xs" style={{ marginRight: '5px' }} />
+                    {reg.animal_nome}
+                  </td>
                   <td>{reg.tipo}</td>
-                  <td>{reg.dataEvento}</td>
+                  <td>{reg.data_evento ? new Date(reg.data_evento).toLocaleDateString('pt-BR') : '-'}</td>
                   <td className="actions-cell">
                     <span className={`status-badge ${reg.resultado === 'Prenha' || reg.resultado === 'Sucesso' ? 'applied' : 'pending'}`}>
-                      {reg.resultado}
+                      {reg.resultado || '-'}
                     </span>
-                   </td>
-                  <td>{reg.criasVivas > 0 ? `${reg.criasVivas} vivas` : '-'}</td>
+                    </td>
+                  <td>{reg.crias_vivas > 0 ? `${reg.crias_vivas} vivas` : '-'}</td>
                   <td className="actions-cell">
-                    <button className="action-btn edit" onClick={() => navigate(`/reproducao/editar/${reg.id}`)}>✏️</button>
-                    <button className="action-btn view" onClick={() => navigate(`/reproducao/visualizar/${reg.id}`)}>👁️</button>
-                    <button className="action-btn delete" onClick={() => handleDelete(reg.id)}>🗑️</button>
-                  </td>
-                </tr>
+                    <button className="action-btn edit" onClick={() => navigate(`/reproducao/editar/${reg.id}`)}>
+                      <img src={editar} alt="Editar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn view" onClick={() => navigate(`/reproducao/visualizar/${reg.id}`)}>
+                      <img src={visu} alt="Visualizar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn delete" onClick={() => handleDelete(reg.id)}>
+                      <img src={excluir} alt="Excluir" className="icon icon-sm icon-hover" />
+                    </button>
+                   </td>
+                 </tr>
               ))}
               {filteredReproducoes.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="empty-message">Nenhum registro encontrado</td>
+                  <td colSpan="6" className="empty-message">
+                    <img src={iconData} alt="Reprodução" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                    <br />Nenhum registro encontrado
+                  </td>
                 </tr>
               )}
             </tbody>

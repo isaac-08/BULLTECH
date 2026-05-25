@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { estoqueAPI } from '../../services/api';
 
 const NovoProduto = () => {
   const navigate = useNavigate();
@@ -34,50 +35,33 @@ const NovoProduto = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const produtos = JSON.parse(localStorage.getItem('estoque') || '[]');
-    const newId = produtos.length > 0 ? Math.max(...produtos.map(p => p.id)) + 1 : 1;
-    
-    const novoProduto = {
-      id: newId,
-      ...formData,
-      quantidade: parseFloat(formData.quantidade),
-      precoUnitario: parseFloat(formData.precoUnitario) || 0,
-      createdAt: new Date().toISOString()
-    };
-    
-    produtos.push(novoProduto);
-    localStorage.setItem('estoque', JSON.stringify(produtos));
-    
-    // Se for uma vacina, também salvar na lista de vacinas
-    if (formData.categoria === 'Vacinas') {
-      const vacinas = JSON.parse(localStorage.getItem('vacinas') || '[]');
-      const newVacinaId = vacinas.length > 0 ? Math.max(...vacinas.map(v => v.id)) + 1 : 1;
-      
-      const novaVacina = {
-        id: newVacinaId,
+    try {
+      // Preparar os dados no formato correto para o Supabase
+      const produtoParaEnviar = {
         nome: formData.nome,
-        fabricante: formData.fornecedor,
-        tipo: '',
-        quantidade: parseInt(formData.quantidade),
-        dataValidade: formData.dataValidade,
-        observacoes: formData.observacoes,
-        status: 'Estoque',
-        estoqueId: newId,
-        createdAt: new Date().toISOString()
+        categoria: formData.categoria,
+        quantidade: parseFloat(formData.quantidade) || 0,
+        unidade: formData.unidade,
+        preco_unitario: parseFloat(formData.precoUnitario) || 0,
+        data_validade: formData.dataValidade || null,
+        fornecedor: formData.fornecedor || null,
+        observacoes: formData.observacoes || null
       };
       
-      vacinas.push(novaVacina);
-      localStorage.setItem('vacinas', JSON.stringify(vacinas));
-    }
-    
-    setTimeout(() => {
-      setLoading(false);
+      console.log('Enviando produto:', produtoParaEnviar);
+      await estoqueAPI.create(produtoParaEnviar);
+      alert('Produto cadastrado com sucesso!');
       navigate('/estoque');
-    }, 500);
+    } catch (error) {
+      console.error('Erro detalhado ao cadastrar produto:', error);
+      alert(`Erro ao cadastrar produto: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -142,7 +126,7 @@ const NovoProduto = () => {
           <div className="form-actions">
             <button type="button" className="btn-cancel" onClick={() => navigate('/estoque')}>Cancelar</button>
             <button type="submit" className="btn-save" disabled={loading}>
-              {loading ? 'Salvando...' : 'Salvar Produto'}
+              {loading ? 'Salvando...' : 'Cadastrar Produto'}
             </button>
           </div>
         </form>

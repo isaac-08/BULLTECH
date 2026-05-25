@@ -1,205 +1,201 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../services/supabase';
+import { animaisAPI } from '../../services/api';
+import iconsAcoes from '../../assets/icons/acoes';
+import dietaIcon from '../../assets/icons/dietas.png';
+import alimentoIcon from '../../assets/icons/alimento.png';
+import animaisIcon from '../../assets/icons/animais.png';
 
 const NovaDieta = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [loading, setLoading] = useState(false);
-  const [animais, setAnimais] = useState([]);
-  const [animaisSelecionados, setAnimaisSelecionados] = useState([]);
   const [alimentos, setAlimentos] = useState([]);
+  const [animais, setAnimais] = useState([]);
   const [alimentosSelecionados, setAlimentosSelecionados] = useState([]);
+  const [animaisSelecionados, setAnimaisSelecionados] = useState([]);
+  const [searchAnimal, setSearchAnimal] = useState('');
+  const [filteredAnimais, setFilteredAnimais] = useState([]);
   const [formData, setFormData] = useState({
     nome: '',
     tipo: 'Concentrado',
-    quantidade: '',
-    unidade: 'kg',
     frequencia: 'Diário',
     observacoes: ''
   });
 
+  const { editar, visu, excluir } = iconsAcoes;
+
   useEffect(() => {
-    // Carregar animais
-    const storedAnimais = localStorage.getItem('animais');
-    if (storedAnimais) {
-      setAnimais(JSON.parse(storedAnimais));
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    try {
+      const { data: estoqueData, error: estoqueError } = await supabase
+        .from('estoque')
+        .select('*')
+        .in('categoria', ['Alimentação', 'Suplementos']);
+      
+      if (estoqueError) throw estoqueError;
+      setAlimentos(estoqueData || []);
+      
+      const animaisData = await animaisAPI.getAll();
+      setAnimais(animaisData || []);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (searchAnimal.trim() === '') {
+      setFilteredAnimais([]);
+      return;
     }
     
-    // Carregar alimentos do estoque (categoria Alimentação e Suplementos)
-    const storedEstoque = localStorage.getItem('estoque');
-    if (storedEstoque) {
-      const todosProdutos = JSON.parse(storedEstoque);
-      const alimentosEstoque = todosProdutos.filter(p => 
-        p.categoria === 'Alimentação' || p.categoria === 'Suplementos'
-      );
-      setAlimentos(alimentosEstoque);
-    }
-    
-    // Se veio de um produto do estoque, preencher automaticamente
-    if (location.state?.produto) {
-      const produto = location.state.produto;
-      setFormData(prev => ({
-        ...prev,
-        nome: produto.nome,
-        tipo: produto.categoria === 'Suplementos' ? 'Suplemento' : 'Concentrado',
-        quantidade: produto.quantidade,
-        unidade: produto.unidade,
-        observacoes: `Produto do estoque - Fornecedor: ${produto.fornecedor || 'Não informado'}`
-      }));
-      // Adicionar o produto aos alimentos selecionados
-      setAlimentosSelecionados([produto]);
-    }
-  }, [location.state]);
+    const filtered = animais.filter(animal => 
+      !animaisSelecionados.find(a => a.id === animal.id) &&
+      (animal.id?.toString().includes(searchAnimal) ||
+       animal.brinco?.toLowerCase().includes(searchAnimal.toLowerCase()) ||
+       animal.nome?.toLowerCase().includes(searchAnimal.toLowerCase()))
+    );
+    setFilteredAnimais(filtered.slice(0, 10));
+  }, [searchAnimal, animais, animaisSelecionados]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSelecionarAnimal = (animalId) => {
-    const animal = animais.find(a => a.id === parseInt(animalId));
-    if (animal && !animaisSelecionados.find(a => a.id === animal.id)) {
+  const handleSelecionarAlimento = async (alimentoId) => {
+    const alimento = alimentos.find(a => a.id === parseInt(alimentoId));
+    if (alimento && !alimentosSelecionados.find(a => a.id === alimento.id)) {
+      setAlimentosSelecionados([
+        ...alimentosSelecionados,
+        { ...alimento, quantidade: 1 }
+      ]);
+    }
+  };
+
+  const handleRemoverAlimento = (alimentoId) => {
+    setAlimentosSelecionados(alimentosSelecionados.filter(a => a.id !== alimentoId));
+  };
+
+  const handleQuantidadeAlimentoChange = (alimentoId, quantidade) => {
+    setAlimentosSelecionados(alimentosSelecionados.map(a => 
+      a.id === alimentoId ? { ...a, quantidade: parseFloat(quantidade) || 0 } : a
+    ));
+  };
+
+  const handleSelecionarAnimal = (animal) => {
+    if (!animaisSelecionados.find(a => a.id === animal.id)) {
       setAnimaisSelecionados([...animaisSelecionados, animal]);
     }
+    setSearchAnimal('');
+    setFilteredAnimais([]);
   };
 
   const handleRemoverAnimal = (animalId) => {
     setAnimaisSelecionados(animaisSelecionados.filter(a => a.id !== animalId));
   };
 
-  const handleSelecionarAlimento = (alimentoId) => {
-    const alimento = alimentos.find(a => a.id === parseInt(alimentoId));
-    if (alimento && !alimentosSelecionados.find(a => a.id === alimento.id)) {
-      setAlimentosSelecionados([...alimentosSelecionados, alimento]);
-      // Se for o primeiro alimento, preencher o nome da dieta
-      if (alimentosSelecionados.length === 0) {
-        setFormData(prev => ({
-          ...prev,
-          nome: `Dieta com ${alimento.nome}`,
-          quantidade: alimento.quantidade,
-          unidade: alimento.unidade,
-          tipo: alimento.categoria === 'Suplementos' ? 'Suplemento' : 'Concentrado'
-        }));
-      }
-    }
-  };
-
-  const handleRemoverAlimento = (alimentoId) => {
-    setAlimentosSelecionados(alimentosSelecionados.filter(a => a.id !== alimentoId));
-    if (alimentosSelecionados.length === 1) {
-      setFormData(prev => ({
-        ...prev,
-        nome: '',
-        quantidade: '',
-        tipo: 'Concentrado'
-      }));
-    }
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (alimentosSelecionados.length === 0) {
+      alert('⚠️ Selecione pelo menos um alimento para esta dieta!');
+      return;
+    }
+    
+    if (animaisSelecionados.length === 0) {
+      alert('⚠️ Selecione pelo menos um animal para esta dieta!');
+      return;
+    }
+    
     setLoading(true);
 
-    const dietas = JSON.parse(localStorage.getItem('dietas') || '[]');
-    const newId = dietas.length > 0 ? Math.max(...dietas.map(d => d.id)) + 1 : 1;
-    
-    const novaDieta = {
-      id: newId,
-      ...formData,
-      quantidade: parseFloat(formData.quantidade),
-      alimentosIds: alimentosSelecionados.map(a => a.id),
-      alimentosNomes: alimentosSelecionados.map(a => a.nome),
-      animaisIds: animaisSelecionados.map(a => a.id),
-      animaisNomes: animaisSelecionados.map(a => a.nome),
-      createdAt: new Date().toISOString()
-    };
-    
-    dietas.push(novaDieta);
-    localStorage.setItem('dietas', JSON.stringify(dietas));
-    
-    // Associar dieta a cada animal
-    const dietasPorAnimal = JSON.parse(localStorage.getItem('dietasPorAnimal') || '[]');
-    
-    animaisSelecionados.forEach(animal => {
-      const novaDietaAnimal = {
-        id: dietasPorAnimal.length > 0 ? Math.max(...dietasPorAnimal.map(d => d.id), 0) + 1 : 1,
-        dietaId: newId,
-        animalId: animal.id,
-        animalNome: animal.nome,
-        animalBrinco: animal.brinco,
-        nomeDieta: formData.nome,
-        alimentos: alimentosSelecionados.map(a => `${a.nome} (${a.quantidade} ${a.unidade})`).join(', '),
-        quantidade: formData.quantidade,
-        unidade: formData.unidade,
-        frequencia: formData.frequencia,
-        dataInicio: new Date().toISOString().split('T')[0],
-        status: 'Ativa',
-        observacoes: formData.observacoes
-      };
-      dietasPorAnimal.push(novaDietaAnimal);
-    });
-    
-    localStorage.setItem('dietasPorAnimal', JSON.stringify(dietasPorAnimal));
-    
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data: perfil } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('auth_id', user.id)
+        .single();
+
+      if (!perfil) throw new Error('Perfil não encontrado');
+
+      const { data: novaDieta, error: dietaError } = await supabase
+        .from('dietas')
+        .insert([{
+          usuario_id: perfil.id,
+          nome: formData.nome,
+          tipo: formData.tipo,
+          frequencia: formData.frequencia,
+          observacoes: formData.observacoes || null
+        }])
+        .select()
+        .single();
+
+      if (dietaError) throw dietaError;
+
+      if (alimentosSelecionados.length > 0) {
+        const alimentosToInsert = alimentosSelecionados.map(alimento => ({
+          dieta_id: novaDieta.id,
+          alimento_id: alimento.id,
+          quantidade: alimento.quantidade,
+          unidade: alimento.unidade
+        }));
+
+        const { error: alimentosError } = await supabase
+          .from('dieta_alimentos')
+          .insert(alimentosToInsert);
+
+        if (alimentosError) throw alimentosError;
+      }
+
+      if (animaisSelecionados.length > 0) {
+        const animaisToInsert = animaisSelecionados.map(animal => ({
+          dieta_id: novaDieta.id,
+          animal_id: animal.id,
+          animal_brinco: animal.brinco,
+          animal_nome: animal.nome,
+          data_inicio: new Date().toISOString().split('T')[0],
+          status: 'Ativa'
+        }));
+
+        const { error: animaisError } = await supabase
+          .from('dieta_animais')
+          .insert(animaisToInsert);
+
+        if (animaisError) throw animaisError;
+      }
+
+      alert(`✅ Dieta "${formData.nome}" criada com sucesso!\n📦 ${alimentosSelecionados.length} alimento(s)\n🐄 ${animaisSelecionados.length} animal(is)`);
       navigate('/dietas');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao cadastrar dieta:', error);
+      alert('Erro ao cadastrar dieta: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const tipos = ['Concentrado', 'Suplemento', 'Volumoso', 'Pastagem'];
-  const unidades = ['kg', 'g', 'tonelada', 'litro', 'ml', 'saco', 'fardo'];
   const frequencias = ['Diário', '2x ao dia', '3x ao dia', 'Semanal', 'A cada 15 dias', 'Mensal'];
 
   return (
     <>
       <div className="welcome-section">
-        <h2>Nova Dieta</h2>
+        <h2>
+          <img src={dietaIcon} alt="Nova Dieta" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Nova Dieta
+        </h2>
         <p>Cadastre uma nova dieta para os animais</p>
       </div>
       
       <div className="page-content">
         <form onSubmit={handleSubmit} className="animal-form">
           <div className="form-grid">
-            {/* Alimentos Disponíveis */}
-            <div className="form-group full-width">
-              <label>Alimentos Disponíveis no Estoque</label>
-              <div className="alimentos-grid-form">
-                {alimentos.map(alimento => (
-                  <div 
-                    key={alimento.id} 
-                    className={`alimento-item-form ${alimentosSelecionados.find(a => a.id === alimento.id) ? 'selected' : ''}`}
-                    onClick={() => handleSelecionarAlimento(alimento.id)}
-                  >
-                    <div className="alimento-nome-form">{alimento.nome}</div>
-                    <div className="alimento-info-form">
-                      <span>{alimento.quantidade} {alimento.unidade}</span>
-                      <span>{alimento.categoria}</span>
-                    </div>
-                  </div>
-                ))}
-                {alimentos.length === 0 && (
-                  <div className="empty-message">Nenhum alimento cadastrado no estoque. 
-                    <button type="button" onClick={() => navigate('/estoque/novo')} className="btn-link">Cadastrar agora</button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Alimentos Selecionados */}
-            {alimentosSelecionados.length > 0 && (
-              <div className="form-group full-width">
-                <label>Alimentos Selecionados:</label>
-                <div className="alimentos-selecionados">
-                  {alimentosSelecionados.map(alimento => (
-                    <div key={alimento.id} className="alimento-selecionado">
-                      <span>{alimento.nome} - {alimento.quantidade} {alimento.unidade}</span>
-                      <button type="button" onClick={() => handleRemoverAlimento(alimento.id)}>✖</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
             <div className="form-group">
               <label>Nome da Dieta *</label>
               <input type="text" name="nome" value={formData.nome} onChange={handleChange} required placeholder="Ex: Ração de Crescimento" />
@@ -215,20 +211,6 @@ const NovaDieta = () => {
             </div>
             
             <div className="form-group">
-              <label>Quantidade por Animal *</label>
-              <input type="number" step="0.01" name="quantidade" value={formData.quantidade} onChange={handleChange} required placeholder="Ex: 5" />
-            </div>
-            
-            <div className="form-group">
-              <label>Unidade *</label>
-              <select name="unidade" value={formData.unidade} onChange={handleChange}>
-                {unidades.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="form-group">
               <label>Frequência *</label>
               <select name="frequencia" value={formData.frequencia} onChange={handleChange}>
                 {frequencias.map(f => (
@@ -236,48 +218,99 @@ const NovaDieta = () => {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Seção de Alimentos */}
+          <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+            <label style={{ fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={alimentoIcon} alt="Alimentos" className="icon icon-sm" />
+              Alimentos da Dieta
+            </label>
+            <p style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>Selecione os alimentos e defina as quantidades</p>
             
-            {/* Seleção de Animais */}
-            <div className="form-group full-width">
-              <label>Selecionar Animais *</label>
-              <div className="animal-selection">
-                <select onChange={(e) => handleSelecionarAnimal(e.target.value)} value="">
-                  <option value="">Selecione um animal</option>
-                  {animais
-                    .filter(a => !animaisSelecionados.find(s => s.id === a.id))
-                    .map(animal => (
-                      <option key={animal.id} value={animal.id}>
-                        {animal.brinco} - {animal.nome}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              
-              {/* Lista de animais selecionados */}
-              {animaisSelecionados.length > 0 && (
-                <div className="animais-selecionados">
-                  <label>Animais selecionados:</label>
-                  <div className="animais-tags">
-                    {animaisSelecionados.map(animal => (
-                      <div key={animal.id} className="animal-tag">
-                        <span>{animal.brinco} - {animal.nome}</span>
-                        <button type="button" onClick={() => handleRemoverAnimal(animal.id)}>✖</button>
-                      </div>
-                    ))}
+            <div style={{ marginTop: '10px' }}>
+              <select onChange={(e) => handleSelecionarAlimento(e.target.value)} value="" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                <option value="">Selecione um alimento</option>
+                {alimentos.map(alimento => (
+                  <option key={alimento.id} value={alimento.id}>
+                    {alimento.nome} - Disponível: {alimento.quantidade} {alimento.unidade}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {alimentosSelecionados.length > 0 && (
+              <div style={{ marginTop: '15px', background: '#f8f9fa', padding: '10px', borderRadius: '8px' }}>
+                <label style={{ fontWeight: 'bold' }}>Alimentos selecionados:</label>
+                {alimentosSelecionados.map(alimento => (
+                  <div key={alimento.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', background: 'white', padding: '8px', borderRadius: '6px' }}>
+                    <span style={{ flex: 2 }}>{alimento.nome}</span>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={alimento.quantidade} 
+                      onChange={(e) => handleQuantidadeAlimentoChange(alimento.id, e.target.value)}
+                      style={{ width: '80px', padding: '5px', borderRadius: '4px', border: '1px solid #ddd', textAlign: 'center' }}
+                    />
+                    <span>{alimento.unidade}</span>
+                    <button type="button" onClick={() => handleRemoverAlimento(alimento.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '18px' }}>✖</button>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Seção de Animais */}
+          <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+            <label style={{ fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={animaisIcon} alt="Animais" className="icon icon-sm" />
+              Animais que receberão a dieta
+            </label>
+            <p style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>{animaisSelecionados.length} animal(is) selecionado(s)</p>
+            
+            <div style={{ marginTop: '10px' }}>
+              <input 
+                type="text"
+                placeholder="Buscar animal por ID, Brinco ou Nome..."
+                value={searchAnimal}
+                onChange={(e) => setSearchAnimal(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}
+              />
+              
+              {filteredAnimais.length > 0 && (
+                <div style={{ marginTop: '10px', border: '1px solid #ddd', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {filteredAnimais.map(animal => (
+                    <div key={animal.id} onClick={() => handleSelecionarAnimal(animal)} style={{ padding: '10px', borderBottom: '1px solid #eee', cursor: 'pointer' }}>
+                      <strong>#{animal.id}</strong> - {animal.brinco} - {animal.nome}
+                      {animal.peso && <span style={{ color: '#666', marginLeft: '10px' }}>🎯 {animal.peso} kg</span>}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-            
-            <div className="form-group full-width">
-              <label>Observações</label>
-              <textarea name="observacoes" rows="3" value={formData.observacoes} onChange={handleChange} placeholder="Observações sobre a dieta..."></textarea>
-            </div>
+
+            {animaisSelecionados.length > 0 && (
+              <div style={{ marginTop: '15px', background: '#f8f9fa', padding: '10px', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {animaisSelecionados.map(animal => (
+                    <div key={animal.id} style={{ background: 'white', padding: '5px 10px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '8px', border: '1px solid #ddd' }}>
+                      <span>{animal.brinco} - {animal.nome}</span>
+                      <button type="button" onClick={() => handleRemoverAnimal(animal.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '16px' }}>✖</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="form-group full-width">
+            <label>Observações</label>
+            <textarea name="observacoes" rows="3" value={formData.observacoes} onChange={handleChange} placeholder="Observações sobre a dieta..."></textarea>
           </div>
           
           <div className="form-actions">
             <button type="button" className="btn-cancel" onClick={() => navigate('/dietas')}>Cancelar</button>
-            <button type="submit" className="btn-save" disabled={loading || animaisSelecionados.length === 0 || alimentosSelecionados.length === 0}>
+            <button type="submit" className="btn-save" disabled={loading}>
               {loading ? 'Salvando...' : 'Salvar Dieta'}
             </button>
           </div>

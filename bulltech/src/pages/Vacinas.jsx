@@ -1,52 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { podeAdicionar, getPlanoAtual, getUsoAtual } from '../utils/limites';
-
+import { vacinasAPI } from '../services/api';
+import { podeAdicionar, getPlanoAtual } from '../utils/limites';
+import iconsAcoes from '../assets/icons/acoes';
+import iconsDash from '../assets/icons/dash';
 
 const Vacinas = () => {
   const navigate = useNavigate();
   const [vacinasAplicadas, setVacinasAplicadas] = useState([]);
-  const [animais, setAnimais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [plano, setPlano] = useState(null);
-  const [uso, setUso] = useState({});
   const [atingiuLimite, setAtingiuLimite] = useState(false);
+
+  const { editar, visu, excluir } = iconsAcoes;
+  const { vacinas: iconVacinas } = iconsDash;
 
   useEffect(() => {
     const planoAtual = getPlanoAtual();
-    const usoAtual = getUsoAtual();
     setPlano(planoAtual);
-    setUso(usoAtual);
-    setAtingiuLimite(usoAtual.vacinas >= planoAtual.limites.vacinas);
     carregarVacinas();
   }, []);
 
-  const carregarVacinas = () => {
-    // Carregar VACINAS APLICADAS (não do estoque)
-    const storedVacinasAplicadas = localStorage.getItem('vacinasAplicadas') || '[]';
-    const vacinas = JSON.parse(storedVacinasAplicadas);
-    setVacinasAplicadas(vacinas);
-    
-    // Carregar animais para referência
-    const storedAnimais = localStorage.getItem('animais') || '[]';
-    setAnimais(JSON.parse(storedAnimais));
-    
-    setLoading(false);
+  const carregarVacinas = async () => {
+    try {
+      setLoading(true);
+      const data = await vacinasAPI.getAll();
+      setVacinasAplicadas(data);
+      if (plano) {
+        setAtingiuLimite(data.length >= plano.limites.vacinas);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar vacinas:', error);
+      alert('Erro ao carregar vacinas');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este registro de vacina?')) {
-      const newVacinas = vacinasAplicadas.filter(v => v.id !== id);
-      setVacinasAplicadas(newVacinas);
-      localStorage.setItem('vacinasAplicadas', JSON.stringify(newVacinas));
-      alert('Registro de vacina excluído com sucesso!');
+      try {
+        await vacinasAPI.delete(id);
+        await carregarVacinas();
+        alert('Registro de vacina excluído com sucesso!');
+      } catch (error) {
+        console.error('Erro ao excluir vacina:', error);
+        alert('Erro ao excluir vacina');
+      }
     }
   };
 
   const handleNovaVacina = () => {
-    const verificacao = podeAdicionar('vacinas', uso.vacinas);
+    const verificacao = podeAdicionar('vacinas', vacinasAplicadas.length);
     if (!verificacao.permitido) {
       alert(verificacao.mensagem);
       return;
@@ -56,8 +63,8 @@ const Vacinas = () => {
 
   const filteredVacinas = vacinasAplicadas.filter(v => {
     const matchesSearch = v.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          v.animalNome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          v.animalBrinco?.toLowerCase().includes(searchTerm.toLowerCase());
+                          v.animal_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          v.animal_brinco?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'Todos' || v.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -65,7 +72,7 @@ const Vacinas = () => {
   const totalVacinas = vacinasAplicadas.length;
   const totalAplicadas = vacinasAplicadas.filter(v => v.status === 'Aplicada').length;
   const totalPendentes = vacinasAplicadas.filter(v => v.status === 'Pendente').length;
-  const totalAnimaisVacinados = new Set(vacinasAplicadas.map(v => v.animalId)).size;
+  const totalAnimaisVacinados = new Set(vacinasAplicadas.map(v => v.animal_id)).size;
 
   if (loading) {
     return (
@@ -84,7 +91,10 @@ const Vacinas = () => {
   return (
     <>
       <div className="welcome-section">
-        <h2>Vacinas Aplicadas</h2>
+        <h2>
+          <img src={iconVacinas} alt="Vacinas" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Vacinas Aplicadas
+        </h2>
         <p>Histórico de vacinas aplicadas nos animais</p>
       </div>
       
@@ -102,7 +112,6 @@ const Vacinas = () => {
           </div>
         )}
         
-        {/* Cards de estatísticas */}
         <div className="stats-cards-animais">
           <div className="stat-card-animais">
             <h3>Total de Vacinas</h3>
@@ -126,14 +135,12 @@ const Vacinas = () => {
           </div>
         </div>
 
-        {/* Botões de ação */}
         <div className="actions-bar" style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button className="btn-novo" onClick={handleNovaVacina} disabled={atingiuLimite}>
             + Registrar Aplicação
           </button>
         </div>
 
-        {/* Filtros */}
         <div className="filters-bar-animais">
           <div className="filters-row">
             <div className="filter-group">
@@ -156,7 +163,6 @@ const Vacinas = () => {
           </div>
         </div>
 
-        {/* Tabela de vacinas aplicadas */}
         <div className="table-container-animais">
           <table className="animais-table">
             <thead>
@@ -174,26 +180,36 @@ const Vacinas = () => {
             <tbody>
               {filteredVacinas.map((vacina) => (
                 <tr key={vacina.id}>
-                  <td>{vacina.dataAplicacao || '-'}</td>
+                  <td>{vacina.data_aplicacao ? new Date(vacina.data_aplicacao).toLocaleDateString('pt-BR') : '-'}</td>
                   <td>{vacina.nome}</td>
-                  <td>{vacina.animalNome || '-'}</td>
-                  <td>{vacina.animalBrinco || '-'}</td>
+                  <td>{vacina.animal_nome || '-'}</td>
+                  <td>{vacina.animal_brinco || '-'}</td>
                   <td>{vacina.dose || '-'}</td>
                   <td>{vacina.aplicador || '-'}</td>
-                  <td className="actions-cell"></td>
+                  <td className="actions-cell">
                     <span className={`status-badge ${vacina.status === 'Aplicada' ? 'applied' : 'pending'}`}>
                       {vacina.status || 'Pendente'}
                     </span>
-                  <td className="actions-cell">
-                    <button className="action-btn edit" onClick={() => navigate(`/vacinas/editar/${vacina.id}`)}>✏️</button>
-                    <button className="action-btn view" onClick={() => navigate(`/vacinas/visualizar/${vacina.id}`)}>👁️</button>
-                    <button className="action-btn delete" onClick={() => handleDelete(vacina.id)}>🗑️</button>
                   </td>
-                </tr>
+                  <td className="actions-cell">
+                    <button className="action-btn edit" onClick={() => navigate(`/vacinas/editar/${vacina.id}`)}>
+                      <img src={editar} alt="Editar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn view" onClick={() => navigate(`/vacinas/visualizar/${vacina.id}`)}>
+                      <img src={visu} alt="Visualizar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn delete" onClick={() => handleDelete(vacina.id)}>
+                      <img src={excluir} alt="Excluir" className="icon icon-sm icon-hover" />
+                    </button>
+                   </td>
+                 </tr>
               ))}
               {filteredVacinas.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="empty-message">Nenhuma vacina aplicada encontrada</td>
+                  <td colSpan="8" className="empty-message">
+                    <img src={iconVacinas} alt="Vacinas" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                    <br />Nenhuma vacina aplicada encontrada
+                  </td>
                 </tr>
               )}
             </tbody>

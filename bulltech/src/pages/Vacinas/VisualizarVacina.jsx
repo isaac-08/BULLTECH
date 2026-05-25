@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { vacinasAPI } from '../../services/api';
 import FormCard, { FormRow, FormGroup } from '../../components/forms/FormCard';
 
 const VisualizarVacina = () => {
@@ -9,15 +10,21 @@ const VisualizarVacina = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const vacinas = JSON.parse(localStorage.getItem('vacinas') || '[]');
-    const found = vacinas.find(v => v.id === parseInt(id));
-    if (found) {
-      setVacina(found);
-    } else {
+    carregarVacina();
+  }, [id]);
+
+  const carregarVacina = async () => {
+    try {
+      setLoading(true);
+      const data = await vacinasAPI.getOne(id);
+      setVacina(data);
+    } catch (error) {
+      console.error('Erro ao carregar vacina:', error);
       navigate('/vacinas');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id, navigate]);
+  };
 
   if (loading) {
     return <div className="loading">Carregando...</div>;
@@ -37,27 +44,33 @@ const VisualizarVacina = () => {
       <div className="page-content">
         <FormCard title="Informações da Vacina">
           <FormRow>
-            <FormGroup label="ID vacina">
+            <FormGroup label="Vacina">
               <p className="view-value">{vacina.nome || '-'}</p>
             </FormGroup>
             <FormGroup label="Data de aplicação">
-              <p className="view-value">{vacina.dataAplicacao || '-'}</p>
+              <p className="view-value">{vacina.data_aplicacao ? new Date(vacina.data_aplicacao).toLocaleDateString('pt-BR') : '-'}</p>
             </FormGroup>
           </FormRow>
 
           <FormRow>
             <FormGroup label="Animal">
-              <p className="view-value">{vacina.animal || vacina.brinco || '-'}</p>
+              <p className="view-value">{vacina.animal_nome || '-'}</p>
             </FormGroup>
-            <FormGroup label="Aplicada por">
-              <p className="view-value">{vacina.aplicador || '-'}</p>
+            <FormGroup label="Brinco">
+              <p className="view-value">{vacina.animal_brinco || '-'}</p>
             </FormGroup>
           </FormRow>
 
           <FormRow>
+            <FormGroup label="Aplicador">
+              <p className="view-value">{vacina.aplicador || '-'}</p>
+            </FormGroup>
             <FormGroup label="Dose">
               <p className="view-value">{vacina.dose || '-'}</p>
             </FormGroup>
+          </FormRow>
+
+          <FormRow>
             <FormGroup label="Status">
               <p className="view-value">
                 <span className={`status-badge ${vacina.status === 'Aplicada' ? 'applied' : 'pending'}`}>
@@ -75,6 +88,9 @@ const VisualizarVacina = () => {
         <div className="form-actions">
           <button className="btn-edit" onClick={() => navigate(`/vacinas/editar/${vacina.id}`)}>
             Editar Vacina
+          </button>
+          <button className="btn-cancel" onClick={() => navigate('/vacinas')}>
+            Voltar
           </button>
         </div>
       </div>

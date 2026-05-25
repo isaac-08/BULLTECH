@@ -1,45 +1,110 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { podeAdicionar, getPlanoAtual, getUsoAtual } from '../utils/limites';
-import { syncLotesStats } from '../utils/syncData';
-
+import { lotesAPI, animaisAPI } from '../services/api';
+import { podeAdicionar, getPlanoAtual } from '../utils/limites';
+import iconsAcoes from '../assets/icons/acoes';
+import iconsDash from '../assets/icons/dash';
 
 const Lotes = () => {
   const navigate = useNavigate();
+
   const [lotes, setLotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('todos');
   const [plano, setPlano] = useState(null);
-  const [uso, setUso] = useState({});
   const [atingiuLimite, setAtingiuLimite] = useState(false);
+
+  const { editar, visu, excluir } = iconsAcoes;
+  const { lotes: iconLotes } = iconsDash;
 
   useEffect(() => {
     const planoAtual = getPlanoAtual();
-    const usoAtual = getUsoAtual();
     setPlano(planoAtual);
-    setUso(usoAtual);
-    setAtingiuLimite(usoAtual.lotes >= planoAtual.limites.lotes);
-    carregarLotes();
+    carregarLotes(planoAtual);
   }, []);
 
-  const carregarLotes = () => {
-    const lotesAtualizados = syncLotesStats();
-    setLotes(lotesAtualizados);
-    setLoading(false);
+  const carregarLotes = async (planoAtual = plano) => {
+    try {
+      setLoading(true);
+
+      const lotesData = await lotesAPI.getAll();
+      const todosAnimais = await animaisAPI.getAll();
+
+      const lotesComContagem = await Promise.all(
+        lotesData.map(async (lote) => {
+          const animaisNoLote = todosAnimais.filter(
+            (animal) =>
+              animal.lote === lote.codigo ||
+              animal.lote === lote.id?.toString()
+          );
+
+          const totalAnimais = animaisNoLote.length;
+          const totalMachos = animaisNoLote.filter(
+            (a) => a.sexo === 'Macho'
+          ).length;
+          const totalFemeas = animaisNoLote.filter(
+            (a) => a.sexo === 'Fêmea'
+          ).length;
+          const pesoMedio =
+            totalAnimais > 0
+              ? animaisNoLote.reduce(
+                  (acc, a) =>
+                    acc + (parseFloat(a.peso) || 0),
+                  0
+                ) / totalAnimais
+              : 0;
+
+          if (lote.total_animais !== totalAnimais) {
+            await lotesAPI.update(lote.id, {
+              ...lote,
+              total_animais: totalAnimais,
+              total_machos: totalMachos,
+              total_femeas: totalFemeas,
+              peso_medio: pesoMedio,
+            });
+          }
+
+          return {
+            ...lote,
+            total_animais: totalAnimais,
+            total_machos: totalMachos,
+            total_femeas: totalFemeas,
+            peso_medio: Math.round(pesoMedio * 100) / 100,
+          };
+        })
+      );
+
+      setLotes(lotesComContagem);
+
+      if (planoAtual) {
+        setAtingiuLimite(
+          lotesData.length >= planoAtual.limites.lotes
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao carregar lotes:', error);
+      alert('Erro ao carregar lotes');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este lote?')) {
-      const newLotes = lotes.filter(lote => lote.id !== id);
-      localStorage.setItem('lotes', JSON.stringify(newLotes));
-      carregarLotes();
-      alert('Lote excluído com sucesso!');
+      try {
+        await lotesAPI.delete(id);
+        await carregarLotes();
+        alert('Lote excluído com sucesso!');
+      } catch (error) {
+        console.error('Erro ao excluir lote:', error);
+        alert('Erro ao excluir lote');
+      }
     }
   };
 
   const handleNovoLote = () => {
-    const verificacao = podeAdicionar('lotes', uso.lotes);
+    const verificacao = podeAdicionar('lotes', lotes.length);
     if (!verificacao.permitido) {
       alert(verificacao.mensagem);
       return;
@@ -47,17 +112,16 @@ const Lotes = () => {
     navigate('/lotes/novo');
   };
 
-  const filteredLotes = lotes.filter(lote => {
-    const matchesSearch = lote.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          lote.id?.toString().includes(searchTerm);
+  const filteredLotes = lotes.filter((lote) => {
+    const matchesSearch = lote.codigo?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTipo = tipoFilter === 'todos' || lote.tipo?.toLowerCase() === tipoFilter;
     return matchesSearch && matchesTipo;
   });
 
   const totalLotes = lotes.length;
   const totalAnimais = lotes.reduce((acc, lote) => acc + (lote.total_animais || 0), 0);
-  const pesoMedio = lotes.length > 0 
-    ? Math.round(lotes.reduce((acc, lote) => acc + (lote.peso_medio || 0), 0) / lotes.length) 
+  const pesoMedio = lotes.length > 0
+    ? Math.round(lotes.reduce((acc, lote) => acc + (lote.peso_medio || 0), 0) / lotes.length)
     : 0;
 
   if (loading) {
@@ -65,7 +129,7 @@ const Lotes = () => {
       <>
         <div className="welcome-section">
           <h2>Lotes</h2>
-          <p>Gerencie os Lotes de sua propriedade</p>
+          <p>Gerencie os lotes de sua propriedade</p>
         </div>
         <div className="page-content">
           <div className="loading">Carregando...</div>
@@ -77,10 +141,13 @@ const Lotes = () => {
   return (
     <>
       <div className="welcome-section">
-        <h2>Lotes</h2>
-        <p>Gerencie os Lotes de sua propriedade</p>
+        <h2>
+          <img src={iconLotes} alt="Lotes" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Lotes
+        </h2>
+        <p>Gerencie os lotes de sua propriedade</p>
       </div>
-      
+
       <div className="page-content">
         {atingiuLimite && (
           <div className="limite-alerta critico">
@@ -88,13 +155,17 @@ const Lotes = () => {
               <span className="limite-icon">⚠️</span>
               <div className="limite-texto">
                 <strong>Limite do plano atingido!</strong>
-                <p>Seu {plano?.nome} permite no máximo {plano?.limites.lotes} lotes. 
-                   <button onClick={() => navigate('/configuracoes')} className="btn-upgrade-inline">Clique aqui</button> para fazer upgrade.</p>
+                <p>
+                  Seu {plano?.nome} permite no máximo {plano?.limites.lotes} lotes.
+                  <button onClick={() => navigate('/configuracoes')} className="btn-upgrade-inline">
+                    Clique aqui
+                  </button> para fazer upgrade.
+                </p>
               </div>
             </div>
           </div>
         )}
-        
+
         <div className="stats-cards-animais">
           <div className="stat-card-animais">
             <h3>Total de Lotes</h3>
@@ -111,11 +182,14 @@ const Lotes = () => {
           </div>
         </div>
 
-        <button 
-          className="btn-novo" 
+        <button
+          className="btn-novo"
           onClick={handleNovoLote}
           disabled={atingiuLimite}
-          style={{ opacity: atingiuLimite ? 0.5 : 1, cursor: atingiuLimite ? 'not-allowed' : 'pointer' }}
+          style={{
+            opacity: atingiuLimite ? 0.5 : 1,
+            cursor: atingiuLimite ? 'not-allowed' : 'pointer',
+          }}
         >
           + Novo Lote
         </button>
@@ -124,9 +198,9 @@ const Lotes = () => {
           <div className="filters-row">
             <div className="filter-group">
               <label>Buscar:</label>
-              <input 
-                type="text" 
-                placeholder="Buscar por código..."
+              <input
+                type="text"
+                placeholder="Buscar por código do lote..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -138,6 +212,7 @@ const Lotes = () => {
                 <option value="pasto">Pasto</option>
                 <option value="confinamento">Confinamento</option>
                 <option value="quarentena">Quarentena</option>
+                <option value="recria">Recria</option>
               </select>
             </div>
           </div>
@@ -154,29 +229,45 @@ const Lotes = () => {
                 <th>Peso Médio (Kg)</th>
                 <th>Machos</th>
                 <th>Fêmeas</th>
+                <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {filteredLotes.map((lote) => (
                 <tr key={lote.id}>
-                  <td>{lote.codigo || lote.id}</td>
+                  <td><strong>{lote.codigo}</strong></td>
                   <td>{lote.area || '-'}</td>
-                  <td>{lote.total_animais || 0}</td>
+                  <td>
+                    <span style={{ fontWeight: 'bold', color: '#3498db' }}>
+                      {lote.total_animais || 0}
+                    </span>
+                  </td>
                   <td>{lote.tipo || 'Pasto'}</td>
-                  <td>{lote.peso_medio || '-'}</td>
+                  <td>{lote.peso_medio ? `${lote.peso_medio} kg` : '-'}</td>
                   <td>{lote.total_machos || 0}</td>
                   <td>{lote.total_femeas || 0}</td>
+                  <td>
+                    <span className={`status-badge ${lote.status === 'Ativo' ? 'applied' : 'pending'}`}>
+                      {lote.status || 'Ativo'}
+                    </span>
+                  </td>
                   <td className="actions-cell">
-                    <button className="action-btn edit" onClick={() => navigate(`/lotes/editar/${lote.id}`)}>✏️</button>
-                    <button className="action-btn view" onClick={() => navigate(`/lotes/visualizar/${lote.id}`)}>👁️</button>
-                    <button className="action-btn delete" onClick={() => handleDelete(lote.id)}>🗑️</button>
+                    <button className="action-btn edit" onClick={() => navigate(`/lotes/editar/${lote.id}`)}>
+                      <img src={editar} alt="Editar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn view" onClick={() => navigate(`/lotes/visualizar/${lote.id}`)}>
+                      <img src={visu} alt="Visualizar" className="icon icon-sm icon-hover" />
+                    </button>
+                    <button className="action-btn delete" onClick={() => handleDelete(lote.id)}>
+                      <img src={excluir} alt="Excluir" className="icon icon-sm icon-hover" />
+                    </button>
                   </td>
                 </tr>
               ))}
               {filteredLotes.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="empty-message">Nenhum lote encontrado</td>
+                  <td colSpan="9" className="empty-message">Nenhum lote encontrado</td>
                 </tr>
               )}
             </tbody>
