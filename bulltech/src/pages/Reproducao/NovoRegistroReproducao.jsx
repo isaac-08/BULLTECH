@@ -1,75 +1,83 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addAnimalFromReproducao } from '../../utils/syncData';
+import { reproducoesAPI, animaisAPI } from '../../services/api';
 
 const NovoRegistroReproducao = () => {
   const navigate = useNavigate();
   const [animais, setAnimais] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    animalId: '',
-    animalNome: '',
-    animalBrinco: '',
+    animal_id: '',
+    animal_nome: '',
+    animal_brinco: '',
     tipo: 'Cobertura',
-    dataEvento: '',
+    data_evento: '',
     resultado: '',
-    criasNascidas: 0,
-    criasVivas: 0,
-    brincoPai: '',
+    crias_nascidas: 0,
+    crias_vivas: 0,
+    brinco_pai: '',
     observacoes: ''
   });
 
   useEffect(() => {
-    const storedAnimais = localStorage.getItem('animais');
-    if (storedAnimais) {
-      setAnimais(JSON.parse(storedAnimais));
-    }
+    carregarAnimais();
   }, []);
+
+  const carregarAnimais = async () => {
+    try {
+      const animaisData = await animaisAPI.getAll();
+      // Filtrar apenas fêmeas para reprodução
+      const femeas = animaisData.filter(a => a.sexo === 'Fêmea');
+      setAnimais(femeas);
+    } catch (error) {
+      console.error('Erro ao carregar animais:', error);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     
-    if (name === 'animalId') {
+    if (name === 'animal_id') {
       const animal = animais.find(a => a.id === parseInt(value));
       setFormData({
         ...formData,
-        animalId: value,
-        animalNome: animal ? animal.nome : '',
-        animalBrinco: animal ? animal.brinco : ''
+        animal_id: value,
+        animal_nome: animal ? animal.nome : '',
+        animal_brinco: animal ? animal.brinco : ''
       });
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const reproducoes = JSON.parse(localStorage.getItem('reproducoes') || '[]');
-    const newId = reproducoes.length > 0 ? Math.max(...reproducoes.map(r => r.id)) + 1 : 1;
-    
-    const novoRegistro = {
-      id: newId,
-      ...formData,
-      criasNascidas: parseInt(formData.criasNascidas) || 0,
-      criasVivas: parseInt(formData.criasVivas) || 0,
-      createdAt: new Date().toISOString()
-    };
-    
-    reproducoes.push(novoRegistro);
-    localStorage.setItem('reproducoes', JSON.stringify(reproducoes));
-    
-    // Se for um parto com crias vivas, criar os animais automaticamente
-    if (formData.tipo === 'Parto' && formData.criasVivas > 0) {
-      const novosAnimais = addAnimalFromReproducao(novoRegistro);
-      alert(`${formData.criasVivas} novo(s) animal(is) adicionado(s) ao rebanho!`);
-    }
-    
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const dadosParaEnviar = {
+        animal_id: parseInt(formData.animal_id),
+        animal_nome: formData.animal_nome,
+        animal_brinco: formData.animal_brinco,
+        tipo: formData.tipo,
+        data_evento: formData.data_evento,
+        resultado: formData.resultado || null,
+        crias_nascidas: parseInt(formData.crias_nascidas) || 0,
+        crias_vivas: parseInt(formData.crias_vivas) || 0,
+        brinco_pai: formData.brinco_pai || null,
+        observacoes: formData.observacoes || null
+      };
+      
+      console.log('Enviando dados:', dadosParaEnviar);
+      await reproducoesAPI.create(dadosParaEnviar);
+      alert('Registro adicionado com sucesso!');
       navigate('/reproducao');
-    }, 500);
+    } catch (error) {
+      console.error('Erro detalhado ao salvar registro:', error);
+      alert(`Erro ao salvar registro: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,8 +91,8 @@ const NovoRegistroReproducao = () => {
         <form onSubmit={handleSubmit} className="animal-form">
           <div className="form-grid">
             <div className="form-group">
-              <label>Animal *</label>
-              <select name="animalId" onChange={handleChange} required>
+              <label>Animal (Fêmea) *</label>
+              <select name="animal_id" onChange={handleChange} required>
                 <option value="">Selecione um animal</option>
                 {animais.map(animal => (
                   <option key={animal.id} value={animal.id}>
@@ -92,6 +100,7 @@ const NovoRegistroReproducao = () => {
                   </option>
                 ))}
               </select>
+              <small className="helper-text">Apenas fêmeas podem ter registros reprodutivos</small>
             </div>
             
             <div className="form-group">
@@ -105,7 +114,7 @@ const NovoRegistroReproducao = () => {
             
             <div className="form-group">
               <label>Data do Evento *</label>
-              <input type="date" name="dataEvento" onChange={handleChange} required />
+              <input type="date" name="data_evento" onChange={handleChange} required />
             </div>
             
             <div className="form-group">
@@ -124,17 +133,17 @@ const NovoRegistroReproducao = () => {
               <>
                 <div className="form-group">
                   <label>Crias Nascidas</label>
-                  <input type="number" name="criasNascidas" min="0" onChange={handleChange} />
+                  <input type="number" name="crias_nascidas" min="0" onChange={handleChange} />
                 </div>
                 
                 <div className="form-group">
                   <label>Crias Vivas</label>
-                  <input type="number" name="criasVivas" min="0" onChange={handleChange} />
+                  <input type="number" name="crias_vivas" min="0" onChange={handleChange} />
                 </div>
                 
                 <div className="form-group">
                   <label>Brinco do Pai (opcional)</label>
-                  <input type="text" name="brincoPai" onChange={handleChange} placeholder="Brinco do reprodutor" />
+                  <input type="text" name="brinco_pai" onChange={handleChange} placeholder="Brinco do reprodutor" />
                 </div>
               </>
             )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { reproducoesAPI } from '../../services/api';
 
 const VisualizarReproducao = () => {
   const navigate = useNavigate();
@@ -8,15 +9,21 @@ const VisualizarReproducao = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const reproducoes = JSON.parse(localStorage.getItem('reproducoes') || '[]');
-    const found = reproducoes.find(r => r.id === parseInt(id));
-    if (found) {
-      setRegistro(found);
-    } else {
+    carregarRegistro();
+  }, [id]);
+
+  const carregarRegistro = async () => {
+    try {
+      setLoading(true);
+      const data = await reproducoesAPI.getOne(id);
+      setRegistro(data);
+    } catch (error) {
+      console.error('Erro ao carregar registro:', error);
       navigate('/reproducao');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id, navigate]);
+  };
 
   if (loading) {
     return (
@@ -48,17 +55,17 @@ const VisualizarReproducao = () => {
           <div className="form-grid">
             <div className="form-group">
               <label>ID do Animal</label>
-              <p className="view-value">{registro.animalId}</p>
+              <p className="view-value">{registro.animal_id}</p>
             </div>
             
             <div className="form-group">
               <label>Brinco</label>
-              <p className="view-value">{registro.animalBrinco || '-'}</p>
+              <p className="view-value">{registro.animal_brinco || '-'}</p>
             </div>
             
             <div className="form-group">
               <label>Animal</label>
-              <p className="view-value">{registro.animalNome}</p>
+              <p className="view-value">{registro.animal_nome}</p>
             </div>
             
             <div className="form-group">
@@ -68,7 +75,7 @@ const VisualizarReproducao = () => {
             
             <div className="form-group">
               <label>Data do Evento</label>
-              <p className="view-value">{registro.dataEvento}</p>
+              <p className="view-value">{registro.data_evento ? new Date(registro.data_evento).toLocaleDateString('pt-BR') : '-'}</p>
             </div>
             
             <div className="form-group">
@@ -82,12 +89,12 @@ const VisualizarReproducao = () => {
             
             <div className="form-group">
               <label>Crias Nascidas</label>
-              <p className="view-value">{registro.criasNascidas || 0}</p>
+              <p className="view-value">{registro.crias_nascidas || 0}</p>
             </div>
             
             <div className="form-group">
               <label>Crias Vivas</label>
-              <p className="view-value">{registro.criasVivas || 0}</p>
+              <p className="view-value">{registro.crias_vivas || 0}</p>
             </div>
             
             <div className="form-group full-width">
@@ -99,6 +106,9 @@ const VisualizarReproducao = () => {
           <div className="form-actions">
             <button className="btn-edit" onClick={() => navigate(`/reproducao/editar/${registro.id}`)}>
               Editar Registro
+            </button>
+            <button className="btn-cancel" onClick={() => navigate('/reproducao')}>
+              Voltar
             </button>
           </div>
         </div>

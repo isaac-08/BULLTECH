@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { authAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { supabase } from '../services/supabase';
 
 const Cadastro = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [error, setError] = useState('');
   const [loadingCep, setLoadingCep] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     // Etapa 1 - Dados da Fazenda
     nomeFazenda: '',
@@ -40,10 +43,7 @@ const Cadastro = () => {
 
   // Função para buscar CEP
   const buscarCep = async (cep) => {
-    // Remove tudo que não é número
     const cepLimpo = cep.replace(/\D/g, '');
-    
-    // Verifica se o CEP tem 8 dígitos
     if (cepLimpo.length !== 8) return;
     
     setLoadingCep(true);
@@ -53,7 +53,6 @@ const Cadastro = () => {
       const data = await response.json();
       
       if (!data.erro) {
-        // Preenche automaticamente os campos
         setFormData(prev => ({
           ...prev,
           endereco: data.logradouro || '',
@@ -74,7 +73,6 @@ const Cadastro = () => {
     }
   };
 
-  // Função chamada quando o usuário digita o CEP
   const handleCepChange = (e) => {
     const valor = e.target.value;
     const cepFormatado = formatarCEP(valor);
@@ -84,7 +82,6 @@ const Cadastro = () => {
       cep: cepFormatado
     });
     
-    // Busca o CEP quando tiver 8 dígitos
     const cepLimpo = valor.replace(/\D/g, '');
     if (cepLimpo.length === 8) {
       buscarCep(cepLimpo);
@@ -136,7 +133,7 @@ const Cadastro = () => {
     setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (step === 3) {
@@ -155,39 +152,51 @@ const Cadastro = () => {
         return;
       }
 
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      
-      if (users.some(user => user.email === formData.email)) {
-        setError('Este email já está cadastrado');
-        return;
+      setLoading(true);
+
+      try {
+        // Registrar no Supabase
+        const result = await authAPI.register(
+          formData.email, 
+          formData.senha, 
+          formData.nomeCompleto, 
+          formData.nomeFazenda
+        );
+
+        if (result.user) {
+          // Atualizar o perfil com mais informações
+          const { error: updateError } = await supabase
+            .from('usuarios')
+            .update({
+              cnpj: formData.cnpj,
+              telefone: formData.telefone,
+              endereco: `${formData.endereco}, ${formData.numero} - ${formData.bairro}, ${formData.cidade} - ${formData.estado}`,
+              cep: formData.cep,
+              cidade: formData.cidade,
+              estado: formData.estado,
+              tipo_producao: formData.tipoProducao
+            })
+            .eq('auth_id', result.user.id);
+
+          if (updateError) {
+            console.error('Erro ao atualizar perfil:', updateError);
+          }
+
+          localStorage.setItem('currentUser', JSON.stringify({
+            id: result.user.id,
+            nome: formData.nomeCompleto,
+            email: formData.email,
+            fazenda: formData.nomeFazenda
+          }));
+          
+          navigate('/dashboard');
+        }
+      } catch (err) {
+        console.error('Erro no cadastro:', err);
+        setError(err.message || 'Erro ao cadastrar. Tente novamente.');
+      } finally {
+        setLoading(false);
       }
-
-      const newUser = {
-        id: Date.now(),
-        nome: formData.nomeCompleto,
-        email: formData.email,
-        senha: formData.senha,
-        fazenda: formData.nomeFazenda,
-        cnpj: formData.cnpj,
-        telefone: formData.telefone,
-        endereco: `${formData.endereco}, ${formData.numero} - ${formData.bairro}, ${formData.cidade} - ${formData.estado}`,
-        cep: formData.cep,
-        cidade: formData.cidade,
-        estado: formData.estado,
-        dataCadastro: new Date().toISOString()
-      };
-
-      users.push(newUser);
-      localStorage.setItem('users', JSON.stringify(users));
-      
-      localStorage.setItem('currentUser', JSON.stringify({
-        id: newUser.id,
-        nome: newUser.nome,
-        email: newUser.email,
-        fazenda: newUser.fazenda
-      }));
-      
-      navigate('/dashboard');
     } else {
       nextStep();
     }
@@ -442,8 +451,8 @@ const Cadastro = () => {
                   ← Anterior
                 </button>
               )}
-              <button type="submit" className="btn-next">
-                {step === 3 ? 'Concluir Cadastro' : 'Próximo →'}
+              <button type="submit" className="btn-next" disabled={loading}>
+                {loading ? 'Cadastrando...' : (step === 3 ? 'Concluir Cadastro' : 'Próximo →')}
               </button>
             </div>
             

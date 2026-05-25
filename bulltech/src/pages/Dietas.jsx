@@ -1,52 +1,121 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { podeAdicionar, getPlanoAtual, getUsoAtual } from '../utils/limites';
-
+import { supabase } from '../services/supabase';
+import { podeAdicionar, getPlanoAtual } from '../utils/limites';
+import iconsAcoes from '../assets/icons/acoes';
+import dietasIcon from '../assets/icons/dietas.png';
 
 const Dietas = () => {
   const navigate = useNavigate();
   const [dietas, setDietas] = useState([]);
+  const [quantidadeAnimais, setQuantidadeAnimais] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('Todos');
   const [plano, setPlano] = useState(null);
-  const [uso, setUso] = useState({});
   const [atingiuLimite, setAtingiuLimite] = useState(false);
+
+  const { editar, visu, excluir } = iconsAcoes;
 
   useEffect(() => {
     const planoAtual = getPlanoAtual();
-    const usoAtual = getUsoAtual();
     setPlano(planoAtual);
-    setUso(usoAtual);
-    setAtingiuLimite(usoAtual.dietas >= planoAtual.limites.dietas);
-    carregarDietas();
+    carregarDietas(planoAtual);
   }, []);
 
-  const carregarDietas = () => {
-    const storedDietas = localStorage.getItem('dietas');
-    if (storedDietas) {
-      setDietas(JSON.parse(storedDietas));
-    } else {
-      const initialDietas = [
-        { id: 1, nome: 'Ração de Crescimento', tipo: 'Concentrado', quantidade: 5, unidade: 'kg', frequencia: '2x ao dia', animais: 'Bovinos' }
-      ];
-      setDietas(initialDietas);
-      localStorage.setItem('dietas', JSON.stringify(initialDietas));
+  const carregarDietas = async (planoAtual) => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('Usuário não autenticado');
+        setLoading(false);
+        return;
+      }
+
+      const { data: perfil, error: perfilError } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('auth_id', user.id)
+        .single();
+
+      if (perfilError) {
+        console.error('Erro ao buscar perfil:', perfilError);
+        setLoading(false);
+        return;
+      }
+
+      if (!perfil) {
+        console.log('Perfil não encontrado');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Perfil ID:', perfil.id);
+
+      const { data: dietasData, error: dietasError } = await supabase
+        .from('dietas')
+        .select('*')
+        .eq('usuario_id', perfil.id)
+        .order('created_at', { ascending: false });
+
+      if (dietasError) {
+        console.error('Erro ao buscar dietas:', dietasError);
+        throw dietasError;
+      }
+      
+      console.log('Dietas carregadas:', dietasData);
+      setDietas(dietasData || []);
+      
+      const qtdMap = {};
+      for (const dieta of (dietasData || [])) {
+        const { count, error } = await supabase
+          .from('dieta_animais')
+          .select('*', { count: 'exact', head: true })
+          .eq('dieta_id', dieta.id);
+        
+        if (!error) {
+          qtdMap[dieta.id] = count || 0;
+        } else {
+          qtdMap[dieta.id] = 0;
+        }
+      }
+      setQuantidadeAnimais(qtdMap);
+      
+      const planoVerificacao = planoAtual || plano;
+      if (planoVerificacao) {
+        setAtingiuLimite((dietasData?.length || 0) >= planoVerificacao.limites.dietas);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dietas:', error);
+      alert('Erro ao carregar dietas: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir esta dieta?')) {
-      const newDietas = dietas.filter(d => d.id !== id);
-      setDietas(newDietas);
-      localStorage.setItem('dietas', JSON.stringify(newDietas));
-      alert('Dieta excluída com sucesso!');
+      try {
+        const { error } = await supabase
+          .from('dietas')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        await carregarDietas();
+        alert('Dieta excluída com sucesso!');
+      } catch (error) {
+        console.error('Erro ao excluir dieta:', error);
+        alert('Erro ao excluir dieta');
+      }
     }
   };
 
   const handleNovaDieta = () => {
-    const verificacao = podeAdicionar('dietas', uso.dietas);
+    const verificacao = podeAdicionar('dietas', dietas.length);
     if (!verificacao.permitido) {
       alert(verificacao.mensagem);
       return;
@@ -60,8 +129,7 @@ const Dietas = () => {
     return matchesSearch && matchesTipo;
   });
 
-  const totalDietas = dietas.length;
-  const tipos = ['Todos', ...new Set(dietas.map(d => d.tipo))];
+  const tipos = ['Todos', ...new Set(dietas.map(d => d.tipo).filter(Boolean))];
 
   if (loading) {
     return (
@@ -80,7 +148,10 @@ const Dietas = () => {
   return (
     <>
       <div className="welcome-section">
-        <h2>Dietas</h2>
+        <h2>
+          <img src={dietasIcon} alt="Dietas" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          Dietas
+        </h2>
         <p>Gerencie as dietas dos animais</p>
       </div>
       
@@ -101,7 +172,7 @@ const Dietas = () => {
         <div className="stats-cards-animais">
           <div className="stat-card-animais">
             <h3>Total de Dietas</h3>
-            <div className="stat-number">{totalDietas}</div>
+            <div className="stat-number">{dietas.length}</div>
             <div className="stat-detail">Limite: {plano?.limites.dietas}</div>
           </div>
         </div>
@@ -143,32 +214,70 @@ const Dietas = () => {
               <tr>
                 <th>Nome</th>
                 <th>Tipo</th>
-                <th>Quantidade</th>
-                <th>Unidade</th>
                 <th>Frequência</th>
                 <th>Animais</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filteredDietas.map((dieta) => (
-                <tr key={dieta.id}>
-                  <td>{dieta.nome}</td>
-                  <td>{dieta.tipo}</td>
-                  <td>{dieta.quantidade} {dieta.unidade}</td>
-                  <td>{dieta.unidade}</td>
-                  <td>{dieta.frequencia}</td>
-                  <td>{dieta.animais || '-'}</td>
-                  <td className="actions-cell">
-                    <button className="action-btn edit" onClick={() => navigate(`/dietas/editar/${dieta.id}`)}>✏️</button>
-                    <button className="action-btn view" onClick={() => navigate(`/dietas/visualizar/${dieta.id}`)}>👁️</button>
-                    <button className="action-btn delete" onClick={() => handleDelete(dieta.id)}>🗑️</button>
-                  </td>
-                </tr>
-              ))}
-              {filteredDietas.length === 0 && (
+              {filteredDietas.length > 0 ? (
+                filteredDietas.map((dieta) => (
+                  <tr key={dieta.id}>
+                    <td style={{ padding: '10px' }}><strong>{dieta.nome}</strong></td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        background: dieta.tipo === 'Concentrado' ? '#3498db' :
+                                    dieta.tipo === 'Suplemento' ? '#2ecc71' :
+                                    dieta.tipo === 'Volumoso' ? '#e67e22' : '#9b59b6',
+                        color: 'white'
+                      }}>
+                        {dieta.tipo || 'Geral'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px' }}>{dieta.frequencia || 'Diário'}</td>
+                    <td style={{ padding: '10px' }}>
+                      <button
+                        onClick={() => navigate(`/dietas/animais/${dieta.id}`)}
+                        style={{
+                          background: '#3498db',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '5px 12px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        {quantidadeAnimais[dieta.id] || 0} animais
+                      </button>
+                    </td>
+                    <td className="actions-cell" style={{ padding: '10px' }}>
+                      <button className="action-btn edit" onClick={() => navigate(`/dietas/editar/${dieta.id}`)}>
+                        <img src={editar} alt="Editar" className="icon icon-sm icon-hover" />
+                      </button>
+                      <button className="action-btn view" onClick={() => navigate(`/dietas/visualizar/${dieta.id}`)}>
+                        <img src={visu} alt="Visualizar" className="icon icon-sm icon-hover" />
+                      </button>
+                      <button className="action-btn delete" onClick={() => handleDelete(dieta.id)}>
+                        <img src={excluir} alt="Excluir" className="icon icon-sm icon-hover" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
-                  <td colSpan="7" className="empty-message">Nenhuma dieta encontrada</td>
+                  <td colSpan="5" className="empty-message" style={{ textAlign: 'center', padding: '40px' }}>
+                    <img src={dietasIcon} alt="Dietas" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                    <br />
+                    Nenhuma dieta cadastrada
+                    <br />
+                    <small>Clique em "+ Nova Dieta" para criar sua primeira dieta</small>
+                  </td>
                 </tr>
               )}
             </tbody>

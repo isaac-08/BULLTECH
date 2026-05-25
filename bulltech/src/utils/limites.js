@@ -66,18 +66,6 @@ export const podeAdicionar = (modulo, quantidadeAtual, quantidadeNova = 1) => {
   };
 };
 
-// Verificar limite antes de salvar
-export const verificarLimiteAntesSalvar = (modulo, dadosAtuais, novoItem) => {
-  const quantidadeAtual = dadosAtuais.length;
-  const verificacao = podeAdicionar(modulo, quantidadeAtual);
-  
-  if (!verificacao.permitido) {
-    alert(verificacao.mensagem);
-    return false;
-  }
-  return true;
-};
-
 // Nome dos módulos para exibição
 const getNomeModulo = (modulo) => {
   const nomes = {
@@ -93,16 +81,16 @@ const getNomeModulo = (modulo) => {
   return nomes[modulo] || modulo;
 };
 
-// Obter uso atual de cada módulo
-export const getUsoAtual = () => {
+// Obter uso atual de cada módulo (agora recebe os dados por parâmetro)
+export const getUsoAtual = (animais = [], lotes = [], funcionarios = [], vacinas = [], pesagens = [], estoque = [], dietas = [], reproducoes = []) => {
   return {
-    animais: JSON.parse(localStorage.getItem('animais') || '[]').length,
-    lotes: JSON.parse(localStorage.getItem('lotes') || '[]').length,
-    funcionarios: JSON.parse(localStorage.getItem('funcionarios') || '[]').length,
-    vacinas: JSON.parse(localStorage.getItem('vacinas') || '[]').length,
-    pesagens: JSON.parse(localStorage.getItem('pesagens') || '[]').length,
-    estoque: JSON.parse(localStorage.getItem('estoque') || '[]').length,
-    dietas: JSON.parse(localStorage.getItem('dietas') || '[]').length,
-    reproducoes: JSON.parse(localStorage.getItem('reproducoes') || '[]').length
+    animais: animais.length,
+    lotes: lotes.length,
+    funcionarios: funcionarios.length,
+    vacinas: vacinas.length,
+    pesagens: pesagens.length,
+    estoque: estoque.length,
+    dietas: dietas.length,
+    reproducoes: reproducoes.length
   };
 };

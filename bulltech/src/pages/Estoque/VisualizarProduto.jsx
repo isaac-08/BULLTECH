@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { estoqueAPI } from '../../services/api';
 
 const VisualizarProduto = () => {
   const navigate = useNavigate();
@@ -8,15 +9,21 @@ const VisualizarProduto = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const produtos = JSON.parse(localStorage.getItem('estoque') || '[]');
-    const found = produtos.find(p => p.id === parseInt(id));
-    if (found) {
-      setProduto(found);
-    } else {
+    carregarProduto();
+  }, [id]);
+
+  const carregarProduto = async () => {
+    try {
+      setLoading(true);
+      const data = await estoqueAPI.getOne(id);
+      setProduto(data);
+    } catch (error) {
+      console.error('Erro ao carregar produto:', error);
       navigate('/estoque');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id, navigate]);
+  };
 
   if (loading) {
     return (
@@ -36,7 +43,7 @@ const VisualizarProduto = () => {
     return null;
   }
 
-  const valorTotal = produto.quantidade * produto.precoUnitario;
+  const valorTotal = (produto.quantidade || 0) * (produto.preco_unitario || 0);
 
   return (
     <>
@@ -65,7 +72,7 @@ const VisualizarProduto = () => {
             
             <div className="form-group">
               <label>Preço Unitário</label>
-              <p className="view-value">R$ {produto.precoUnitario.toFixed(2)}</p>
+              <p className="view-value">R$ {(produto.preco_unitario || 0).toFixed(2)}</p>
             </div>
             
             <div className="form-group">
@@ -75,7 +82,7 @@ const VisualizarProduto = () => {
             
             <div className="form-group">
               <label>Data de Validade</label>
-              <p className="view-value">{produto.dataValidade || '-'}</p>
+              <p className="view-value">{produto.data_validade || '-'}</p>
             </div>
             
             <div className="form-group">

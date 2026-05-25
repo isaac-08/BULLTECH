@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { vacinasAPI } from '../../services/api';
 import FormCard, { FormRow, FormGroup } from '../../components/forms/FormCard';
 
 const EditarVacina = () => {
@@ -9,33 +10,40 @@ const EditarVacina = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const vacinas = JSON.parse(localStorage.getItem('vacinas') || '[]');
-    const vacina = vacinas.find(v => v.id === parseInt(id));
-    if (vacina) {
-      setFormData(vacina);
-    } else {
-      navigate('/vacinas');
-    }
-    setLoading(false);
-  }, [id, navigate]);
+    carregarVacina();
+  }, [id]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const carregarVacina = async () => {
+    try {
+      setLoading(true);
+      const data = await vacinasAPI.getOne(id);
+      setFormData(data);
+    } catch (error) {
+      console.error('Erro ao carregar vacina:', error);
+      navigate('/vacinas');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const vacinas = JSON.parse(localStorage.getItem('vacinas') || '[]');
-    const index = vacinas.findIndex(v => v.id === parseInt(id));
-    
-    if (index !== -1) {
-      vacinas[index] = { ...formData, updatedAt: new Date().toISOString() };
-      localStorage.setItem('vacinas', JSON.stringify(vacinas));
+    setLoading(true);
+
+    try {
+      await vacinasAPI.update(id, formData);
+      alert('Vacina atualizada com sucesso!');
+      navigate('/vacinas');
+    } catch (error) {
+      console.error('Erro ao atualizar vacina:', error);
+      alert('Erro ao atualizar vacina');
+    } finally {
+      setLoading(false);
     }
-    
-    navigate('/vacinas');
   };
 
   if (loading) {
@@ -57,17 +65,26 @@ const EditarVacina = () => {
         <form onSubmit={handleSubmit}>
           <FormCard title="Informações da Vacina">
             <FormRow>
-              <FormGroup label="ID vacina">
+              <FormGroup label="Vacina">
                 <input type="text" name="nome" value={formData.nome || ''} onChange={handleChange} />
               </FormGroup>
               <FormGroup label="Data de aplicação">
-                <input type="text" name="dataAplicacao" value={formData.dataAplicacao || ''} onChange={handleChange} />
+                <input type="date" name="data_aplicacao" value={formData.data_aplicacao || ''} onChange={handleChange} />
               </FormGroup>
             </FormRow>
 
             <FormRow>
+              <FormGroup label="Animal">
+                <input type="text" name="animal_nome" value={formData.animal_nome || ''} onChange={handleChange} />
+              </FormGroup>
               <FormGroup label="Aplicada por">
                 <input type="text" name="aplicador" value={formData.aplicador || ''} onChange={handleChange} />
+              </FormGroup>
+            </FormRow>
+
+            <FormRow>
+              <FormGroup label="Dose">
+                <input type="text" name="dose" value={formData.dose || ''} onChange={handleChange} />
               </FormGroup>
               <FormGroup label="Status">
                 <select name="status" value={formData.status || 'Pendente'} onChange={handleChange}>

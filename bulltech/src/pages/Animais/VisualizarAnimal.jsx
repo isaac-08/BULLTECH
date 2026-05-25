@@ -1,28 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { supabase } from '../../services/supabase';
+import { animaisAPI, lotesAPI, pesagensAPI, vacinasAPI, reproducoesAPI } from '../../services/api';
 import { calcularGanhoMedioAnimal, formatarGanhoDiario } from '../../utils/calculosPesagem';
+import iconsAcoes from '../../assets/icons/acoes';
+import animaisIcon from '../../assets/icons/animais.png';
+import lotesIcon from '../../assets/icons/lotes.png';
+import vacinasIcon from '../../assets/icons/vacinas.png';
+import pesagensIcon from '../../assets/icons/pesagem.png';
+import dietasIcon from '../../assets/icons/dietas.png';
 
 const VisualizarAnimal = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+
   const [animal, setAnimal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('lotes');
-  
-  // Dados reais
+
   const [pesagensReais, setPesagensReais] = useState([]);
   const [vacinasReais, setVacinasReais] = useState([]);
   const [reproducoesReais, setReproducoesReais] = useState([]);
-  const [dietasReais, setDietasReais] = useState([]);
   const [lotesReais, setLotesReais] = useState([]);
+  const [dietasReais, setDietasReais] = useState([]);
   const [ganhoMedio, setGanhoMedio] = useState(null);
 
+  const { editar, visu, excluir } = iconsAcoes;
+
   const tabs = [
-    { id: 'lotes', label: 'Lotes' },
-    { id: 'pesagens', label: 'Pesagens' },
-    { id: 'vacinas', label: 'Vacinas' },
+    { id: 'lotes', label: 'Lotes', icon: lotesIcon },
+    { id: 'pesagens', label: 'Pesagens', icon: pesagensIcon },
+    { id: 'vacinas', label: 'Vacinas', icon: vacinasIcon },
     { id: 'reproducao', label: 'Reprodução' },
-    { id: 'dietas', label: 'Dietas' },
+    { id: 'dietas', label: 'Dietas', icon: dietasIcon },
     { id: 'observacoes', label: 'Observações' }
   ];
 
@@ -30,111 +40,117 @@ const VisualizarAnimal = () => {
     carregarDados();
   }, [id]);
 
-  const carregarDados = () => {
-    const animais = JSON.parse(localStorage.getItem('animais') || '[]');
-    const found = animais.find(a => a.id === parseInt(id));
-    
-    if (found) {
-      setAnimal(found);
-      
-      // Carregar pesagens
-      const todasPesagens = JSON.parse(localStorage.getItem('pesagens') || '[]');
+  const carregarDados = async () => {
+    try {
+      setLoading(true);
+
+      const animalData = await animaisAPI.getOne(id);
+      setAnimal(animalData);
+
+      const todasPesagens = await pesagensAPI.getAll();
       const pesagensAnimal = todasPesagens
-        .filter(p => p.animalId === parseInt(id) || p.animalNome === found.nome)
-        .sort((a, b) => {
-          const dataA = a.dataPesagem.split('/').reverse().join('-');
-          const dataB = b.dataPesagem.split('/').reverse().join('-');
-          return new Date(dataB) - new Date(dataA);
-        });
+        .filter(p => p.animal_id === parseInt(id))
+        .sort((a, b) => new Date(b.data_pesagem) - new Date(a.data_pesagem));
       setPesagensReais(pesagensAnimal);
-      
-      // Calcular ganho médio
+
       const ganho = calcularGanhoMedioAnimal(pesagensAnimal);
       setGanhoMedio(ganho);
-      
-      // Carregar vacinas
-      const todasVacinas = JSON.parse(localStorage.getItem('vacinas') || '[]');
-      const vacinasAnimal = todasVacinas.filter(v => 
-        v.animalId === parseInt(id) || 
-        v.animalBrinco === found.brinco ||
-        v.animalNome === found.nome
-      );
+
+      const todasVacinas = await vacinasAPI.getAll();
+      const vacinasAnimal = todasVacinas.filter(v => v.animal_id === parseInt(id));
       setVacinasReais(vacinasAnimal);
-      
-      // Carregar reproduções
-      const todasReproducoes = JSON.parse(localStorage.getItem('reproducoes') || '[]');
-      const reproducoesAnimal = todasReproducoes.filter(r => r.animalId === parseInt(id));
+
+      const todasReproducoes = await reproducoesAPI.getAll();
+      const reproducoesAnimal = todasReproducoes.filter(r => r.animal_id === parseInt(id));
       setReproducoesReais(reproducoesAnimal);
-      
-      // Carregar dietas
-      const dietasPorAnimal = JSON.parse(localStorage.getItem('dietasPorAnimal') || '[]');
-      const dietasAnimal = dietasPorAnimal.filter(d => d.animalId === parseInt(id));
-      setDietasReais(dietasAnimal);
-      
-      // Carregar lotes
-      const lotes = JSON.parse(localStorage.getItem('lotes') || '[]');
-      setLotesReais(lotes);
-    } else {
+
+      const lotesData = await lotesAPI.getAll();
+      setLotesReais(lotesData);
+
+      const { data: dietasAnimal, error: dietasError } = await supabase
+        .from('dieta_animais')
+        .select(`
+          id,
+          dieta_id,
+          data_inicio,
+          status,
+          dietas (
+            id,
+            nome,
+            tipo,
+            frequencia,
+            observacoes
+          )
+        `)
+        .eq('animal_id', parseInt(id))
+        .eq('status', 'Ativa');
+
+      if (dietasError) {
+        console.error('Erro ao buscar dietas:', dietasError);
+      } else {
+        setDietasReais(dietasAnimal || []);
+      }
+
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
       navigate('/animais');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  // Criar timeline com todos os eventos
   const criarTimeline = () => {
     const eventos = [];
-    
+
     pesagensReais.forEach(p => {
       eventos.push({
-        data: p.dataPesagem,
+        data: p.data_pesagem,
         titulo: 'Pesagem registrada',
         descricao: `${p.peso} kg - ${p.tipo || 'Pesagem rotineira'}`,
-        tipo: 'pesagem'
+        icon: pesagensIcon
       });
     });
-    
+
     vacinasReais.forEach(v => {
       eventos.push({
-        data: v.dataAplicacao,
+        data: v.data_aplicacao,
         titulo: `Vacinação: ${v.nome}`,
         descricao: `${v.dose || '1° dose'} - Aplicado por: ${v.aplicador || 'Não informado'}`,
-        tipo: 'vacina'
+        icon: vacinasIcon
       });
     });
-    
+
     reproducoesReais.forEach(r => {
       eventos.push({
-        data: r.dataEvento,
-        titulo: r.tipo === 'Parto' ? '🤰 Parto' : '🐂 Cobertura realizada',
-        descricao: r.tipo === 'Parto' 
-          ? `${r.criasNascidas || 1} crias nascidas, ${r.criasVivas || 1} vivas`
+        data: r.data_evento,
+        titulo: r.tipo === 'Parto' ? 'Parto' : 'Cobertura',
+        descricao: r.tipo === 'Parto'
+          ? `${r.crias_nascidas || 1} crias nascidas, ${r.crias_vivas || 1} vivas`
           : `Tipo: ${r.tipo} - Resultado: ${r.resultado || 'Realizado'}`,
-        tipo: 'reproducao'
+        icon: null
       });
     });
-    
-    dietasReais.forEach(d => {
-      eventos.push({
-        data: d.dataInicio,
-        titulo: `Dieta: ${d.nomeDieta}`,
-        descricao: `${d.quantidade} ${d.unidade} - ${d.frequencia}`,
-        tipo: 'dieta'
-      });
+
+    dietasReais.forEach(item => {
+      if (item.dietas && item.data_inicio) {
+        eventos.push({
+          data: item.data_inicio,
+          titulo: `Dieta: ${item.dietas.nome}`,
+          descricao: `${item.dietas.frequencia || 'Diário'} - Status: ${item.status || 'Ativa'}`,
+          icon: dietasIcon
+        });
+      }
     });
-    
-    return eventos.sort((a, b) => {
-      const dataA = a.data.split('/').reverse().join('-');
-      const dataB = b.data.split('/').reverse().join('-');
-      return new Date(dataB) - new Date(dataA);
-    });
+
+    return eventos.sort(
+      (a, b) => new Date(b.data) - new Date(a.data)
+    );
   };
 
   const timeline = criarTimeline();
-  
-  // Encontrar lote atual
-  const loteAtual = lotesReais.find(l => 
-    l.codigo === animal?.lote || 
-    l.id?.toString() === animal?.lote
+
+  const loteAtual = lotesReais.find(
+    l => l.codigo === animal?.lote
   );
 
   if (loading) {
@@ -158,12 +174,15 @@ const VisualizarAnimal = () => {
   return (
     <>
       <div className="welcome-section">
-        <h2>{animal.nome}</h2>
+        <h2>
+          <img src={animaisIcon} alt="Animal" className="icon icon-md" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+          {animal.nome}
+        </h2>
         <p>Visualize todos os detalhes do animal</p>
       </div>
-      
+
       <div className="page-content">
-        {/* Informações básicas do animal */}
+
         <div className="animal-info-header">
           <div className="info-grid-basic">
             <div className="info-item">
@@ -217,7 +236,6 @@ const VisualizarAnimal = () => {
           </div>
         </div>
 
-        {/* Abas */}
         <div className="animal-tabs">
           <div className="tabs-header">
             {tabs.map(tab => (
@@ -226,33 +244,42 @@ const VisualizarAnimal = () => {
                 className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
               >
+                {tab.icon && <img src={tab.icon} alt={tab.label} className="icon icon-xs" style={{ marginRight: '6px' }} />}
                 {tab.label}
               </button>
             ))}
           </div>
-          
+
           <div className="tabs-content">
-            {/* Aba Lotes */}
+
+            {/* ABA LOTES */}
             {activeTab === 'lotes' && (
               <div className="tab-pane">
                 <div className="lote-atual-info">
                   <h4>Lotes Atuais</h4>
                   <div className="lote-card">
-                    <div className="lote-nome">{loteAtual?.codigo || animal.lote || 'Sem lote'}</div>
-                    <div className="lote-tipo">{loteAtual?.tipo || 'Não definido'}</div>
+                    <div className="lote-nome">
+                      {loteAtual?.codigo || animal.lote || 'Sem lote'}
+                    </div>
+                    <div className="lote-tipo">
+                      {loteAtual?.tipo || 'Não definido'}
+                    </div>
                   </div>
                 </div>
-                
                 <div className="historico-lotes-info">
                   <h4>Histórico de Lotes</h4>
                   <div className="historico-item">
                     <div className="historico-periodo">
-                      {animal.criado_em ? new Date(animal.criado_em).toLocaleDateString('pt-BR') : 'Data de entrada'} - Atual
+                      {animal.created_at ? new Date(animal.created_at).toLocaleDateString('pt-BR') : 'Data de entrada'} - Atual
                     </div>
                     <div className="historico-detalhes">
-                      <div className="historico-nome">{loteAtual?.codigo || animal.lote || 'Sem lote'}</div>
+                      <div className="historico-nome">
+                        {loteAtual?.codigo || animal.lote || 'Sem lote'}
+                      </div>
                       <div className="historico-motivo">
-                        {loteAtual ? `Pertence ao lote ${loteAtual.codigo}` : (animal.lote ? `Pertence ao lote ${animal.lote}` : 'Sem lote definido')}
+                        {loteAtual
+                          ? `Pertence ao lote ${loteAtual.codigo}`
+                          : (animal.lote ? `Pertence ao lote ${animal.lote}` : 'Sem lote definido')}
                       </div>
                     </div>
                   </div>
@@ -260,7 +287,7 @@ const VisualizarAnimal = () => {
               </div>
             )}
 
-            {/* Aba Pesagens */}
+            {/* ABA PESAGENS */}
             {activeTab === 'pesagens' && (
               <div className="tab-pane">
                 {pesagensReais.length > 0 ? (
@@ -278,9 +305,9 @@ const VisualizarAnimal = () => {
                         let ganho = null;
                         if (index < pesagensReais.length - 1) {
                           const pesagemAnterior = pesagensReais[index + 1];
-                          const dataAtual = new Date(p.dataPesagem.split('/').reverse().join('-'));
-                          const dataAnterior = new Date(pesagemAnterior.dataPesagem.split('/').reverse().join('-'));
-                          const diffDias = Math.floor((dataAtual - dataAnterior) / (1000 * 60 * 60 * 24));
+                          const diffDias = Math.floor(
+                            (new Date(p.data_pesagem) - new Date(pesagemAnterior.data_pesagem)) / (1000 * 60 * 60 * 24)
+                          );
                           if (diffDias > 0) {
                             const diffPeso = (p.peso - pesagemAnterior.peso) * 1000;
                             ganho = Math.round((diffPeso / diffDias) * 100) / 100;
@@ -288,7 +315,7 @@ const VisualizarAnimal = () => {
                         }
                         return (
                           <tr key={index}>
-                            <td>{p.dataPesagem}</td>
+                            <td>{p.data_pesagem ? new Date(p.data_pesagem).toLocaleDateString('pt-BR') : '-'}</td>
                             <td>{p.peso} kg</td>
                             <td className={ganho < 0 ? 'negative-gain' : ''}>
                               {ganho ? `${ganho} g/dia` : '-'}
@@ -305,7 +332,7 @@ const VisualizarAnimal = () => {
               </div>
             )}
 
-            {/* Aba Vacinas */}
+            {/* ABA VACINAS */}
             {activeTab === 'vacinas' && (
               <div className="tab-pane">
                 {vacinasReais.length > 0 ? (
@@ -322,7 +349,7 @@ const VisualizarAnimal = () => {
                     <tbody>
                       {vacinasReais.map((v, index) => (
                         <tr key={index}>
-                          <td>{v.dataAplicacao || '-'}</td>
+                          <td>{v.data_aplicacao ? new Date(v.data_aplicacao).toLocaleDateString('pt-BR') : '-'}</td>
                           <td>{v.nome}</td>
                           <td>{v.dose || '-'}</td>
                           <td>{v.aplicador || '-'}</td>
@@ -330,8 +357,8 @@ const VisualizarAnimal = () => {
                             <span className={`status-badge ${v.status === 'Aplicada' ? 'applied' : 'pending'}`}>
                               {v.status || 'Aplicada'}
                             </span>
-                           </td>
-                          </tr>
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -341,7 +368,7 @@ const VisualizarAnimal = () => {
               </div>
             )}
 
-            {/* Aba Reprodução */}
+            {/* ABA REPRODUÇÃO */}
             {activeTab === 'reproducao' && (
               <div className="tab-pane">
                 {reproducoesReais.length > 0 ? (
@@ -357,15 +384,15 @@ const VisualizarAnimal = () => {
                     <tbody>
                       {reproducoesReais.map((r, index) => (
                         <tr key={index}>
-                          <td>{r.dataEvento}</td>
+                          <td>{r.data_evento ? new Date(r.data_evento).toLocaleDateString('pt-BR') : '-'}</td>
                           <td>{r.tipo}</td>
                           <td className="actions-cell">
                             <span className={`status-badge ${r.resultado === 'Prenha' || r.resultado === 'Sucesso' ? 'applied' : 'pending'}`}>
                               {r.resultado || '-'}
                             </span>
-                           </td>
-                          <td>{r.criasVivas ? `${r.criasVivas} vivas` : '-'}</td>
-                         </tr>
+                          </td>
+                          <td>{r.crias_vivas ? `${r.crias_vivas} vivas` : '-'}</td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -375,35 +402,39 @@ const VisualizarAnimal = () => {
               </div>
             )}
 
-            {/* Aba Dietas */}
+            {/* ABA DIETAS */}
             {activeTab === 'dietas' && (
               <div className="tab-pane">
                 {dietasReais.length > 0 ? (
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Dieta</th>
+                        <th>Nome da Dieta</th>
                         <th>Tipo</th>
-                        <th>Quantidade</th>
                         <th>Frequência</th>
                         <th>Data Início</th>
                         <th>Status</th>
+                        <th>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dietasReais.map((d, index) => (
+                      {dietasReais.map((item, index) => (
                         <tr key={index}>
-                          <td>{d.nomeDieta}</td>
-                          <td>{d.tipo || '-'}</td>
-                          <td>{d.quantidade} {d.unidade}</td>
-                          <td>{d.frequencia}</td>
-                          <td>{d.dataInicio}</td>
-                          <td className="actions-cell">
-                            <span className={`status-badge ${d.status === 'Ativa' ? 'applied' : 'pending'}`}>
-                              {d.status || 'Ativa'}
+                          <td><strong>{item.dietas?.nome || '-'}</strong></td>
+                          <td>{item.dietas?.tipo || '-'}</td>
+                          <td>{item.dietas?.frequencia || '-'}</td>
+                          <td>{item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-BR') : '-'}</td>
+                          <td>
+                            <span className={`status-badge ${item.status === 'Ativa' ? 'applied' : 'pending'}`}>
+                              {item.status || 'Ativa'}
                             </span>
-                           </td>
-                         </tr>
+                          </td>
+                          <td className="actions-cell">
+                            <button className="action-btn view" onClick={() => navigate(`/dietas/visualizar/${item.dieta_id}`)}>
+                              <img src={visu} alt="Visualizar" className="icon icon-sm icon-hover" />
+                            </button>
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -413,50 +444,31 @@ const VisualizarAnimal = () => {
               </div>
             )}
 
-            {/* Aba Observações */}
+            {/* ABA OBSERVAÇÕES */}
             {activeTab === 'observacoes' && (
               <div className="tab-pane">
                 <div className="observacoes-info">
                   <p>{animal.observacoes || 'Nenhuma observação cadastrada para este animal.'}</p>
                 </div>
-                {/* Genealogia */}
-                {(animal.brincoMae || animal.brincoPai) && (
-                  <div className="genealogia-info" style={{ marginTop: '20px' }}>
-                    <h4>Genealogia</h4>
-                    <div className="info-grid-basic">
-                      <div className="info-item">
-                        <span className="info-label">Brinco da Mãe:</span>
-                        <span className="info-value">{animal.brincoMae || '-'}</span>
-                      </div>
-                      <div className="info-item">
-                        <span className="info-label">Brinco do Pai:</span>
-                        <span className="info-value">{animal.brincoPai || '-'}</span>
-                      </div>
-                      <div className="info-item">
-                        <span className="info-label">Lote da Mãe:</span>
-                        <span className="info-value">{animal.loteMae || '-'}</span>
-                      </div>
-                      <div className="info-item">
-                        <span className="info-label">Lote do Pai:</span>
-                        <span className="info-value">{animal.lotePai || '-'}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
+
           </div>
         </div>
 
-        {/* Linha do Tempo */}
         {timeline.length > 0 && (
           <div className="timeline-container">
-            <h3>Linha do Tempo</h3>
+            <h3>📅 Linha do Tempo</h3>
             <div className="timeline">
               {timeline.map((evento, index) => (
                 <div key={index} className="timeline-item">
-                  <div className="timeline-date">{evento.data}</div>
+                  <div className="timeline-date">
+                    {evento.data ? new Date(evento.data).toLocaleDateString('pt-BR') : '-'}
+                  </div>
                   <div className="timeline-content">
+                    {evento.icon && (
+                      <img src={evento.icon} alt="" className="icon icon-xs" style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                    )}
                     <div className="timeline-title">{evento.titulo}</div>
                     <div className="timeline-description">{evento.descricao}</div>
                   </div>
@@ -466,15 +478,16 @@ const VisualizarAnimal = () => {
           </div>
         )}
 
-        {/* Botões de ação */}
         <div className="form-actions" style={{ marginTop: '20px' }}>
           <button className="btn-edit" onClick={() => navigate(`/animais/editar/${animal.id}`)}>
+            <img src={editar} alt="Editar" className="icon icon-sm icon-hover" style={{ marginRight: '5px' }} />
             Editar Animal
           </button>
           <button className="btn-cancel" onClick={() => navigate('/animais')}>
             Voltar
           </button>
         </div>
+
       </div>
     </>
   );

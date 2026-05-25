@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { funcionariosAPI } from '../../services/api';
 
 const EditarFuncionario = () => {
   const navigate = useNavigate();
@@ -18,16 +19,35 @@ const EditarFuncionario = () => {
     'Outros'
   ];
 
+  const niveisAcesso = [
+    { value: 'ADMIN', label: 'Administrador - Acesso total' },
+    { value: 'VETERINARIO', label: 'Veterinário - Animais, Vacinas, Reprodução, Pesagens' },
+    { value: 'TRATADOR', label: 'Tratador - Animais, Pesagens, Dietas' },
+    { value: 'SECRETARIA', label: 'Secretaria - Funcionários, Estoque, Relatórios' },
+    { value: 'VISUALIZADOR', label: 'Visualizador - Apenas visualização' }
+  ];
+
   useEffect(() => {
-    const funcionarios = JSON.parse(localStorage.getItem('funcionarios') || '[]');
-    const found = funcionarios.find(f => f.id === parseInt(id));
-    if (found) {
-      setFormData(found);
-    } else {
+    carregarFuncionario();
+  }, [id]);
+
+  const carregarFuncionario = async () => {
+    try {
+      setLoading(true);
+      const data = await funcionariosAPI.getOne(id);
+      // Converter nomes dos campos para o formato do formulário
+      setFormData({
+        ...data,
+        data_admissao: data.data_admissao?.split('T')[0] || '',
+        nivel_acesso: data.nivel_acesso || 'VISUALIZADOR'
+      });
+    } catch (error) {
+      console.error('Erro ao carregar funcionário:', error);
       navigate('/funcionarios');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id, navigate]);
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -57,26 +77,31 @@ const EditarFuncionario = () => {
     setFormData({ ...formData, telefone: formatarTelefone(e.target.value) });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    const funcionarios = JSON.parse(localStorage.getItem('funcionarios') || '[]');
-    const index = funcionarios.findIndex(f => f.id === parseInt(id));
-    
-    if (index !== -1) {
-      funcionarios[index] = { 
-        ...formData, 
+    try {
+      await funcionariosAPI.update(id, {
+        nome: formData.nome,
+        email: formData.email,
+        cpf: formData.cpf || null,
+        telefone: formData.telefone || null,
+        cargo: formData.cargo,
+        nivel_acesso: formData.nivel_acesso,
         salario: parseFloat(formData.salario) || 0,
-        updatedAt: new Date().toISOString() 
-      };
-      localStorage.setItem('funcionarios', JSON.stringify(funcionarios));
-    }
-    
-    setTimeout(() => {
-      setSaving(false);
+        data_admissao: formData.data_admissao,
+        status: formData.status,
+        observacoes: formData.observacoes || null
+      });
+      alert('Funcionário atualizado com sucesso!');
       navigate('/funcionarios');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao atualizar funcionário:', error);
+      alert('Erro ao atualizar funcionário');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -113,23 +138,18 @@ const EditarFuncionario = () => {
             </div>
             
             <div className="form-group">
-              <label>CPF *</label>
-              <input type="text" name="cpf" value={formData.cpf || ''} onChange={handleCPFChange} required />
+              <label>Email *</label>
+              <input type="email" name="email" value={formData.email || ''} onChange={handleChange} required />
             </div>
             
             <div className="form-group">
-              <label>Data de Nascimento</label>
-              <input type="date" name="dataNascimento" value={formData.dataNascimento || ''} onChange={handleChange} />
+              <label>CPF</label>
+              <input type="text" name="cpf" value={formData.cpf || ''} onChange={handleCPFChange} maxLength="14" />
             </div>
             
             <div className="form-group">
-              <label>Telefone *</label>
-              <input type="tel" name="telefone" value={formData.telefone || ''} onChange={handleTelefoneChange} required />
-            </div>
-            
-            <div className="form-group">
-              <label>E-mail</label>
-              <input type="email" name="email" value={formData.email || ''} onChange={handleChange} />
+              <label>Telefone</label>
+              <input type="tel" name="telefone" value={formData.telefone || ''} onChange={handleTelefoneChange} />
             </div>
             
             <div className="form-group">
@@ -142,13 +162,22 @@ const EditarFuncionario = () => {
             </div>
             
             <div className="form-group">
+              <label>Nível de Acesso *</label>
+              <select name="nivel_acesso" value={formData.nivel_acesso || 'VISUALIZADOR'} onChange={handleChange} required>
+                {niveisAcesso.map(nivel => (
+                  <option key={nivel.value} value={nivel.value}>{nivel.label}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="form-group">
               <label>Salário (R$)</label>
               <input type="number" step="0.01" name="salario" value={formData.salario || ''} onChange={handleChange} />
             </div>
             
             <div className="form-group">
               <label>Data de Admissão *</label>
-              <input type="date" name="dataAdmissao" value={formData.dataAdmissao || ''} onChange={handleChange} required />
+              <input type="date" name="data_admissao" value={formData.data_admissao || ''} onChange={handleChange} required />
             </div>
             
             <div className="form-group">

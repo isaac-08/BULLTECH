@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { syncLotesStats } from '../../utils/syncData';
+import { animaisAPI, lotesAPI } from '../../services/api';
 
 const EditarAnimal = () => {
   const navigate = useNavigate();
@@ -9,62 +9,134 @@ const EditarAnimal = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(null);
-  const [loteOriginal, setLoteOriginal] = useState('');
 
-  useEffect(() => {
-    const storedLotes = localStorage.getItem('lotes');
-    const storedAnimais = localStorage.getItem('animais');
-    
-    if (storedLotes) {
-      setLotes(JSON.parse(storedLotes));
-    }
-    
-    if (storedAnimais) {
-      const animais = JSON.parse(storedAnimais);
-      const animal = animais.find(a => a.id === parseInt(id));
-      if (animal) {
-        setFormData(animal);
-        setLoteOriginal(animal.lote || '');
-      } else {
-        navigate('/animais');
-      }
-    }
-    setLoading(false);
-  }, [id, navigate]);
+  const especies = [
+    { value: 'Bovino', label: '🐂 Bovino' },
+    { value: 'Equino', label: '🐎 Equino' },
+    { value: 'Suíno', label: '🐷 Suíno' },
+    { value: 'Ovino', label: '🐑 Ovino' },
+    { value: 'Caprino', label: '🐐 Caprino' },
+    { value: 'Ave', label: '🐔 Ave' }
+  ];
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const racas = {
+    Bovino: [
+      { value: 'Nelore', label: 'Nelore' },
+      { value: 'Angus', label: 'Angus' },
+      { value: 'Hereford', label: 'Hereford' },
+      { value: 'Brahman', label: 'Brahman' },
+      { value: 'Girolando', label: 'Girolando' },
+      { value: 'Holandês', label: 'Holandês' },
+      { value: 'Jersey', label: 'Jersey' },
+      { value: 'Sindi', label: 'Sindi' },
+      { value: 'Tabapuã', label: 'Tabapuã' },
+      { value: 'Outra', label: 'Outra' }
+    ],
+    Equino: [
+      { value: 'Puro Sangue Inglês', label: 'Puro Sangue Inglês' },
+      { value: 'Quarto de Milha', label: 'Quarto de Milha' },
+      { value: 'Mangalarga', label: 'Mangalarga' },
+      { value: 'Campolina', label: 'Campolina' },
+      { value: 'Crioulo', label: 'Crioulo' },
+      { value: 'Outra', label: 'Outra' }
+    ],
+    Suíno: [
+      { value: 'Landrace', label: 'Landrace' },
+      { value: 'Large White', label: 'Large White' },
+      { value: 'Duroc', label: 'Duroc' },
+      { value: 'Pietrain', label: 'Pietrain' },
+      { value: 'Outra', label: 'Outra' }
+    ],
+    Ovino: [
+      { value: 'Santa Inês', label: 'Santa Inês' },
+      { value: 'Dorper', label: 'Dorper' },
+      { value: 'Suffolk', label: 'Suffolk' },
+      { value: 'Outra', label: 'Outra' }
+    ],
+    Caprino: [
+      { value: 'Saanen', label: 'Saanen' },
+      { value: 'Anglo-Nubiana', label: 'Anglo-Nubiana' },
+      { value: 'Boer', label: 'Boer' },
+      { value: 'Outra', label: 'Outra' }
+    ],
+    Ave: [
+      { value: 'Cobb', label: 'Cobb' },
+      { value: 'Ross', label: 'Ross' },
+      { value: 'Label Rouge', label: 'Label Rouge' },
+      { value: 'Outra', label: 'Outra' }
+    ]
   };
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    carregarDados();
+  }, [id]);
+
+  const carregarDados = async () => {
+    try {
+      setLoading(true);
+      
+      const lotesData = await lotesAPI.getAll();
+      setLotes(lotesData);
+      
+      const animalData = await animaisAPI.getOne(id);
+      setFormData(animalData);
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      alert('Erro ao carregar animal');
+      navigate('/animais');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (name === 'especie') {
+      setFormData({ 
+        ...formData, 
+        especie: value,
+        raca: ''
+      });
+    } else if (name === 'data_nascimento') {
+      setFormData({ ...formData, data_nascimento: value });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    const animais = JSON.parse(localStorage.getItem('animais') || '[]');
-    const index = animais.findIndex(a => a.id === parseInt(id));
-    
-    if (index !== -1) {
-      animais[index] = { 
-        ...formData, 
+    try {
+      const animalAtualizado = {
+        brinco: formData.brinco,
+        nome: formData.nome,
+        sexo: formData.sexo,
+        idade: formData.idade,
         peso: formData.peso ? parseFloat(formData.peso) : null,
-        updatedAt: new Date().toISOString() 
+        lote: formData.lote,
+        status: formData.status,
+        raca: formData.raca,
+        especie: formData.especie,
+        data_nascimento: formData.data_nascimento || null,
+        observacoes: formData.observacoes
       };
-      localStorage.setItem('animais', JSON.stringify(animais));
       
-      // Sincronizar lotes (tanto o lote original quanto o novo)
-      if (loteOriginal) {
-        syncLotesStats();
-      }
-      if (formData.lote && formData.lote !== loteOriginal) {
-        syncLotesStats();
-      }
-    }
-    
-    setTimeout(() => {
-      setSaving(false);
+      await animaisAPI.update(id, animalAtualizado);
+      alert('Animal atualizado com sucesso!');
       navigate('/animais');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao atualizar animal:', error);
+      alert('Erro ao atualizar animal');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const racasDisponiveis = formData?.especie ? racas[formData.especie] || [] : [];
 
   if (loading) {
     return (
@@ -129,16 +201,30 @@ const EditarAnimal = () => {
               </select>
             </div>
             <div className="form-group">
-              <label>Raça</label>
-              <input type="text" name="raca" value={formData.raca || ''} onChange={handleChange} />
+              <label>Espécie</label>
+              <select name="especie" value={formData.especie || ''} onChange={handleChange}>
+                <option value="">Selecione a espécie</option>
+                {especies.map(esp => (
+                  <option key={esp.value} value={esp.value}>
+                    {esp.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
-              <label>Espécie</label>
-              <input type="text" name="especie" value={formData.especie || ''} onChange={handleChange} />
+              <label>Raça</label>
+              <select name="raca" value={formData.raca || ''} onChange={handleChange} disabled={!formData.especie}>
+                <option value="">{formData.especie ? 'Selecione a raça' : 'Selecione a espécie primeiro'}</option>
+                {racasDisponiveis.map(raca => (
+                  <option key={raca.value} value={raca.value}>
+                    {raca.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label>Data de Nascimento</label>
-              <input type="date" name="dataNascimento" value={formData.dataNascimento || ''} onChange={handleChange} />
+              <input type="date" name="data_nascimento" value={formData.data_nascimento || ''} onChange={handleChange} />
             </div>
             <div className="form-group">
               <label>Status</label>

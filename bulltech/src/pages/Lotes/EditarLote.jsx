@@ -1,45 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { lotesAPI } from '../../services/api';
 import FormCard, { FormRow, FormGroup } from '../../components/forms/FormCard';
 
 const EditarLote = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [formData, setFormData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState(null);
 
   useEffect(() => {
-    const lotes = JSON.parse(localStorage.getItem('lotes') || '[]');
-    const lote = lotes.find(l => l.id === parseInt(id));
-    if (lote) {
-      setFormData(lote);
-    } else {
-      navigate('/lotes');
-    }
-    setLoading(false);
-  }, [id, navigate]);
+    carregarLote();
+  }, [id]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const carregarLote = async () => {
+    try {
+      setLoading(true);
+      const data = await lotesAPI.getOne(id);
+      setFormData(data);
+    } catch (error) {
+      console.error('Erro ao carregar lote:', error);
+      navigate('/lotes');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const lotes = JSON.parse(localStorage.getItem('lotes') || '[]');
-    const index = lotes.findIndex(l => l.id === parseInt(id));
-    
-    if (index !== -1) {
-      lotes[index] = { ...formData, updatedAt: new Date().toISOString() };
-      localStorage.setItem('lotes', JSON.stringify(lotes));
+    setSaving(true);
+
+    try {
+      await lotesAPI.update(id, formData);
+      alert('Lote atualizado com sucesso!');
+      navigate('/lotes');
+    } catch (error) {
+      console.error('Erro ao atualizar lote:', error);
+      alert('Erro ao atualizar lote');
+    } finally {
+      setSaving(false);
     }
-    
-    navigate('/lotes');
   };
 
   if (loading) {
-    return <div className="loading">Carregando...</div>;
+    return (
+      <>
+        <div className="welcome-section">
+          <h2>Editar Lote</h2>
+          <p>Altere as informações do lote</p>
+        </div>
+        <div className="page-content">
+          <div className="loading">Carregando...</div>
+        </div>
+      </>
+    );
   }
 
   if (!formData) {
@@ -85,44 +104,6 @@ const EditarLote = () => {
                   <option>Recria</option>
                 </select>
               </FormGroup>
-              <FormGroup label="Total de Animais">
-                <input 
-                  type="number" 
-                  name="totalAnimais" 
-                  value={formData.totalAnimais || 0} 
-                  onChange={handleChange}
-                />
-              </FormGroup>
-            </FormRow>
-
-            <FormRow>
-              <FormGroup label="Peso Médio (Kg)">
-                <input 
-                  type="number" 
-                  name="pesoMedio" 
-                  value={formData.pesoMedio || 0} 
-                  onChange={handleChange}
-                />
-              </FormGroup>
-              <FormGroup label="Total de Machos">
-                <input 
-                  type="number" 
-                  name="totalMachos" 
-                  value={formData.totalMachos || 0} 
-                  onChange={handleChange}
-                />
-              </FormGroup>
-            </FormRow>
-
-            <FormRow>
-              <FormGroup label="Total de Fêmeas">
-                <input 
-                  type="number" 
-                  name="totalFemeas" 
-                  value={formData.totalFemeas || 0} 
-                  onChange={handleChange}
-                />
-              </FormGroup>
             </FormRow>
 
             <FormGroup label="Observações">
@@ -139,8 +120,8 @@ const EditarLote = () => {
             <button type="button" className="btn-cancel" onClick={() => navigate('/lotes')}>
               Cancelar
             </button>
-            <button type="submit" className="btn-save">
-              Salvar Alterações
+            <button type="submit" className="btn-save" disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
             </button>
           </div>
         </form>

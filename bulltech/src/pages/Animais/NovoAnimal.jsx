@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { syncLotesStats } from '../../utils/syncData';
+import { animaisAPI, lotesAPI } from '../../services/api';
 
 const NovoAnimal = () => {
   const navigate = useNavigate();
@@ -16,11 +16,10 @@ const NovoAnimal = () => {
     status: 'Ativo',
     raca: '',
     especie: '',
-    dataNascimento: '',
+    data_nascimento: '',
     observacoes: ''
   });
 
-  // Opções pré-definidas
   const especies = [
     { value: 'Bovino', label: '🐂 Bovino' },
     { value: 'Equino', label: '🐎 Equino' },
@@ -79,56 +78,65 @@ const NovoAnimal = () => {
   };
 
   useEffect(() => {
-    const storedLotes = localStorage.getItem('lotes');
-    if (storedLotes) {
-      setLotes(JSON.parse(storedLotes));
-    }
+    carregarLotes();
   }, []);
+
+  const carregarLotes = async () => {
+    try {
+      const data = await lotesAPI.getAll();
+      setLotes(data);
+    } catch (error) {
+      console.error('Erro ao carregar lotes:', error);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     
-    // Se mudar a espécie, limpar a raça
     if (name === 'especie') {
       setFormData({ 
         ...formData, 
         especie: value,
-        raca: '' // Limpa a raça quando muda a espécie
+        raca: ''
       });
+    } else if (name === 'data_nascimento') {
+      setFormData({ ...formData, data_nascimento: value });
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const animais = JSON.parse(localStorage.getItem('animais') || '[]');
-    const newId = animais.length > 0 ? Math.max(...animais.map(a => a.id)) + 1 : 1;
-    
-    const novoAnimal = {
-      id: newId,
-      ...formData,
-      peso: formData.peso ? parseFloat(formData.peso) : null,
-      createdAt: new Date().toISOString()
-    };
-    
-    animais.push(novoAnimal);
-    localStorage.setItem('animais', JSON.stringify(animais));
-    
-    // Sincronizar o lote (atualizar estatísticas)
-    if (formData.lote) {
-      syncLotesStats();
-    }
-    
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const animalParaEnviar = {
+        brinco: formData.brinco,
+        nome: formData.nome,
+        sexo: formData.sexo,
+        idade: formData.idade,
+        peso: formData.peso ? parseFloat(formData.peso) : null,
+        lote: formData.lote,
+        status: formData.status,
+        raca: formData.raca,
+        especie: formData.especie,
+        data_nascimento: formData.data_nascimento || null,
+        observacoes: formData.observacoes
+      };
+      
+      console.log('Enviando animal:', animalParaEnviar);
+      await animaisAPI.create(animalParaEnviar);
+      alert('Animal cadastrado com sucesso!');
       navigate('/animais');
-    }, 500);
+    } catch (error) {
+      console.error('Erro detalhado ao cadastrar animal:', error);
+      alert(`Erro ao cadastrar animal: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Obter raças disponíveis baseado na espécie selecionada
   const racasDisponiveis = formData.especie ? racas[formData.especie] || [] : [];
 
   return (
@@ -199,7 +207,7 @@ const NovoAnimal = () => {
             </div>
             <div className="form-group">
               <label>Data de Nascimento</label>
-              <input type="date" name="dataNascimento" onChange={handleChange} />
+              <input type="date" name="data_nascimento" onChange={handleChange} />
             </div>
             <div className="form-group">
               <label>Status</label>

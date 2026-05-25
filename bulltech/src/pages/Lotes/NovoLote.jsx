@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { syncLotesStats } from '../../utils/syncData';
+import { lotesAPI } from '../../services/api';
 import FormCard, { FormRow, FormGroup } from '../../components/forms/FormCard';
 
 const NovoLote = () => {
@@ -10,6 +10,10 @@ const NovoLote = () => {
     codigo: '',
     area: '',
     tipo: 'Pasto',
+    total_animais: 0,
+    peso_medio: 0,
+    total_machos: 0,
+    total_femeas: 0,
     observacoes: ''
   });
 
@@ -17,33 +21,20 @@ const NovoLote = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const lotes = JSON.parse(localStorage.getItem('lotes') || '[]');
-    const newId = lotes.length > 0 ? Math.max(...lotes.map(l => l.id)) + 1 : 1;
-    
-    const novoLote = {
-      id: newId,
-      ...formData,
-      total_animais: 0,
-      peso_medio: 0,
-      total_machos: 0,
-      total_femeas: 0,
-      createdAt: new Date().toISOString()
-    };
-    
-    lotes.push(novoLote);
-    localStorage.setItem('lotes', JSON.stringify(lotes));
-    
-    // Sincronizar estatísticas
-    syncLotesStats();
-    
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await lotesAPI.create(formData);
+      alert('Lote cadastrado com sucesso!');
       navigate('/lotes');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao cadastrar lote:', error);
+      alert('Erro ao cadastrar lote');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

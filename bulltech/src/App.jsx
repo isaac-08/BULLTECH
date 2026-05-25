@@ -44,6 +44,11 @@ import EditarFuncionario from './pages/Funcionarios/EditarFuncionario';
 import VisualizarFuncionario from './pages/Funcionarios/VisualizarFuncionario';
 import EsqueciSenha from './pages/EsqueciSenha';
 import Plano from './pages/Planos';
+import TesteConexao from './pages/TesteConexao';
+import LoginFuncionario from './pages/LoginFuncionario';
+import DashboardFuncionario from './pages/DashboardFuncionario';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+
 
 function App() {
   return (
@@ -57,6 +62,14 @@ function App() {
         <Route path="/cadastro" element={<Cadastro />} />
         <Route path="/plano" element={<Plano />} />
         <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+        <Route path="/teste" element={<TesteConexao />} />
+        <Route path="/login-funcionario" element={<LoginFuncionario />} />
+        <Route path="/dashboard-funcionario" element={<DashboardFuncionario />} />
+
+
+        {/* Rotas de admin */}
+        <Route path="/admin" element={<AdminDashboard />} />
+        
         
         {/* Rotas do dashboard com layout compartilhado */}
         <Route element={<DashboardLayout />}>

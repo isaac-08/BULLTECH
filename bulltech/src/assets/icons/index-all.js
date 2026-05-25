@@ -6,6 +6,7 @@ import index from './index';
 import relat from './relat';
 import relatorio from './relatorio';
 import sobre from './sobre';
+import footer from './footer';  
 
 const icons = {
   acoes,
@@ -16,6 +17,7 @@ const icons = {
   relat,
   relatorio,
   sobre,
+  footer,  // NOVO
 };
 
 export default icons;

@@ -1,62 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { reproducoesAPI } from '../../services/api';
 
 const EditarReproducao = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [animais, setAnimais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(null);
 
   useEffect(() => {
-    const storedAnimais = localStorage.getItem('animais');
-    if (storedAnimais) {
-      setAnimais(JSON.parse(storedAnimais));
-    }
-    
-    const reproducoes = JSON.parse(localStorage.getItem('reproducoes') || '[]');
-    const found = reproducoes.find(r => r.id === parseInt(id));
-    if (found) {
-      setFormData(found);
-    } else {
-      navigate('/reproducao');
-    }
-    setLoading(false);
-  }, [id, navigate]);
+    carregarRegistro();
+  }, [id]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === 'animalId') {
-      const animal = animais.find(a => a.id === parseInt(value));
-      setFormData({
-        ...formData,
-        animalId: value,
-        animalNome: animal ? animal.nome : '',
-        animalBrinco: animal ? animal.brinco : ''
-      });
-    } else {
-      setFormData({ ...formData, [name]: value });
+  const carregarRegistro = async () => {
+    try {
+      setLoading(true);
+      const data = await reproducoesAPI.getOne(id);
+      setFormData(data);
+    } catch (error) {
+      console.error('Erro ao carregar registro:', error);
+      navigate('/reproducao');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    const reproducoes = JSON.parse(localStorage.getItem('reproducoes') || '[]');
-    const index = reproducoes.findIndex(r => r.id === parseInt(id));
-    
-    if (index !== -1) {
-      reproducoes[index] = { ...formData, updatedAt: new Date().toISOString() };
-      localStorage.setItem('reproducoes', JSON.stringify(reproducoes));
-    }
-    
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      await reproducoesAPI.update(id, formData);
+      alert('Registro atualizado com sucesso!');
       navigate('/reproducao');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao atualizar registro:', error);
+      alert('Erro ao atualizar registro');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -88,15 +75,8 @@ const EditarReproducao = () => {
         <form onSubmit={handleSubmit} className="animal-form">
           <div className="form-grid">
             <div className="form-group">
-              <label>Animal *</label>
-              <select name="animalId" value={formData.animalId} onChange={handleChange} required>
-                <option value="">Selecione um animal</option>
-                {animais.map(animal => (
-                  <option key={animal.id} value={animal.id}>
-                    {animal.brinco} - {animal.nome}
-                  </option>
-                ))}
-              </select>
+              <label>Animal</label>
+              <input type="text" value={formData.animal_nome} disabled />
             </div>
             
             <div className="form-group">
@@ -110,7 +90,7 @@ const EditarReproducao = () => {
             
             <div className="form-group">
               <label>Data do Evento *</label>
-              <input type="date" name="dataEvento" value={formData.dataEvento} onChange={handleChange} required />
+              <input type="date" name="data_evento" value={formData.data_evento} onChange={handleChange} required />
             </div>
             
             <div className="form-group">
@@ -127,12 +107,12 @@ const EditarReproducao = () => {
             
             <div className="form-group">
               <label>Crias Nascidas</label>
-              <input type="number" name="criasNascidas" min="0" value={formData.criasNascidas || 0} onChange={handleChange} />
+              <input type="number" name="crias_nascidas" min="0" value={formData.crias_nascidas || 0} onChange={handleChange} />
             </div>
             
             <div className="form-group">
               <label>Crias Vivas</label>
-              <input type="number" name="criasVivas" min="0" value={formData.criasVivas || 0} onChange={handleChange} />
+              <input type="number" name="crias_vivas" min="0" value={formData.crias_vivas || 0} onChange={handleChange} />
             </div>
             
             <div className="form-group full-width">

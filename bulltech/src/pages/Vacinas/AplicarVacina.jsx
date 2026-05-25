@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { vacinasAPI, animaisAPI, estoqueAPI } from '../../services/api';
 
 const AplicarVacina = () => {
   const navigate = useNavigate();
@@ -19,19 +20,21 @@ const AplicarVacina = () => {
   });
 
   useEffect(() => {
-    const storedAnimais = localStorage.getItem('animais');
-    const storedEstoque = localStorage.getItem('estoque');
-    
-    if (storedAnimais) {
-      setAnimais(JSON.parse(storedAnimais));
-    }
-    
-    // Carregar vacinas do estoque
-    if (storedEstoque) {
-      const vacinasEstoque = JSON.parse(storedEstoque).filter(item => item.categoria === 'Vacinas');
-      setVacinasEstoque(vacinasEstoque);
-    }
+    carregarDados();
   }, []);
+
+  const carregarDados = async () => {
+    try {
+      const animaisData = await animaisAPI.getAll();
+      setAnimais(animaisData);
+      
+      const estoqueData = await estoqueAPI.getAll();
+      const vacinas = estoqueData.filter(item => item.categoria === 'Vacinas');
+      setVacinasEstoque(vacinas);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -56,56 +59,44 @@ const AplicarVacina = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    // Registrar aplicação no histórico de vacinas
-    const vacinasAplicadas = JSON.parse(localStorage.getItem('vacinasAplicadas') || '[]');
-    const newId = vacinasAplicadas.length > 0 ? Math.max(...vacinasAplicadas.map(v => v.id)) + 1 : 1;
-    
-    const novaAplicacao = {
-      id: newId,
-      ...formData,
-      status: 'Aplicada',
-      createdAt: new Date().toISOString()
-    };
-    
-    vacinasAplicadas.push(novaAplicacao);
-    localStorage.setItem('vacinasAplicadas', JSON.stringify(vacinasAplicadas));
-    
-    // ========== SALVAR TAMBÉM NA LISTA DE VACINAS DO ANIMAL ==========
-    const vacinasDoAnimal = JSON.parse(localStorage.getItem('vacinas') || '[]');
-    const novaVacinaAnimal = {
-      id: vacinasDoAnimal.length > 0 ? Math.max(...vacinasDoAnimal.map(v => v.id)) + 1 : 1,
-      animalId: parseInt(formData.animalId),
-      animalNome: formData.animalNome,
-      animalBrinco: formData.animalBrinco,
-      nome: formData.vacinaNome,
-      dataAplicacao: formData.dataAplicacao,
-      aplicador: formData.aplicador,
-      dose: formData.dose,
-      status: 'Aplicada',
-      observacoes: formData.observacoes,
-      createdAt: new Date().toISOString()
-    };
-    
-    vacinasDoAnimal.push(novaVacinaAnimal);
-    localStorage.setItem('vacinas', JSON.stringify(vacinasDoAnimal));
-    
-    // ATUALIZAR QUANTIDADE NO ESTOQUE (diminuir 1 dose)
-    const estoque = JSON.parse(localStorage.getItem('estoque') || '[]');
-    const vacinaIndex = estoque.findIndex(v => v.id === parseInt(formData.vacinaId));
-    
-    if (vacinaIndex !== -1 && estoque[vacinaIndex].quantidade > 0) {
-      estoque[vacinaIndex].quantidade -= 1;
-      localStorage.setItem('estoque', JSON.stringify(estoque));
-    }
-    
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const novaAplicacao = {
+        animal_id: parseInt(formData.animalId),
+        animal_nome: formData.animalNome,
+        animal_brinco: formData.animalBrinco,
+        nome: formData.vacinaNome,
+        data_aplicacao: formData.dataAplicacao,
+        aplicador: formData.aplicador,
+        dose: formData.dose,
+        status: 'Aplicada',
+        observacoes: formData.observacoes
+      };
+      
+      await vacinasAPI.create(novaAplicacao);
+      
+      // Atualizar quantidade no estoque
+      const estoque = await estoqueAPI.getAll();
+      const vacinaIndex = estoque.findIndex(v => v.id === parseInt(formData.vacinaId));
+      if (vacinaIndex !== -1 && estoque[vacinaIndex].quantidade > 0) {
+        const vacinaAtualizada = {
+          ...estoque[vacinaIndex],
+          quantidade: estoque[vacinaIndex].quantidade - 1
+        };
+        await estoqueAPI.update(formData.vacinaId, vacinaAtualizada);
+      }
+      
+      alert('Vacina aplicada com sucesso!');
       navigate('/vacinas');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao aplicar vacina:', error);
+      alert('Erro ao aplicar vacina');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

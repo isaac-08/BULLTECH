@@ -1,100 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { calcularGanhoDiario, formatarGanhoDiario } from '../../utils/calculosPesagem';
+import { pesagensAPI } from '../../services/api';
 
 const EditarPesagem = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [animais, setAnimais] = useState([]);
-  const [pesagensExistentes, setPesagensExistentes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [ganhoCalculado, setGanhoCalculado] = useState(null);
   const [formData, setFormData] = useState(null);
 
   useEffect(() => {
-    const storedAnimais = localStorage.getItem('animais');
-    const storedPesagens = localStorage.getItem('pesagens');
-    
-    if (storedAnimais) {
-      setAnimais(JSON.parse(storedAnimais));
-    }
-    if (storedPesagens) {
-      const pesagens = JSON.parse(storedPesagens);
-      setPesagensExistentes(pesagens);
-      
-      const found = pesagens.find(p => p.id === parseInt(id));
-      if (found) {
-        setFormData(found);
-      } else {
-        navigate('/pesagens');
-      }
-    }
-    setLoading(false);
-  }, [id, navigate]);
+    carregarPesagem();
+  }, [id]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === 'animalId') {
-      const animal = animais.find(a => a.id === parseInt(value));
+  const carregarPesagem = async () => {
+    try {
+      setLoading(true);
+      const data = await pesagensAPI.getOne(id);
       setFormData({
-        ...formData,
-        animalId: value,
-        animalNome: animal ? animal.nome : '',
-        animalBrinco: animal ? animal.brinco : ''
+        ...data,
+        data_pesagem: data.data_pesagem?.split('T')[0] || ''
       });
-    } else if (name === 'dataPesagem' || name === 'peso') {
-      setFormData({ ...formData, [name]: value });
-      
-      // Calcular ganho diário automaticamente (excluindo a pesagem atual)
-      if (formData.animalId && formData.dataPesagem && value) {
-        const dataAtual = name === 'dataPesagem' ? value : formData.dataPesagem;
-        const pesoAtual = name === 'peso' ? parseFloat(value) : parseFloat(formData.peso);
-        
-        if (dataAtual && pesoAtual) {
-          // Filtrar pesagens anteriores (excluindo a atual)
-          const outrasPesagens = pesagensExistentes.filter(p => p.id !== parseInt(id));
-          
-          const ganho = calcularGanhoDiario(
-            parseInt(formData.animalId), 
-            pesoAtual, 
-            dataAtual, 
-            outrasPesagens
-          );
-          setGanhoCalculado(ganho);
-          
-          if (ganho !== null) {
-            setFormData(prev => ({ ...prev, ganhoDiario: ganho.toString() }));
-          }
-        }
-      }
-    } else {
-      setFormData({ ...formData, [name]: value });
+    } catch (error) {
+      console.error('Erro ao carregar pesagem:', error);
+      navigate('/pesagens');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    const pesagens = JSON.parse(localStorage.getItem('pesagens') || '[]');
-    const index = pesagens.findIndex(p => p.id === parseInt(id));
-    
-    if (index !== -1) {
-      pesagens[index] = { 
-        ...formData, 
-        peso: parseFloat(formData.peso),
-        ganhoDiario: formData.ganhoDiario ? parseFloat(formData.ganhoDiario) : null,
-        updatedAt: new Date().toISOString() 
-      };
-      localStorage.setItem('pesagens', JSON.stringify(pesagens));
-    }
-    
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      await pesagensAPI.update(id, formData);
+      alert('Pesagem atualizada com sucesso!');
       navigate('/pesagens');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao atualizar pesagem:', error);
+      alert('Erro ao atualizar pesagem');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -115,18 +67,6 @@ const EditarPesagem = () => {
     return null;
   }
 
-  // Obter informações da última pesagem anterior
-  const getUltimaPesagemInfo = () => {
-    const pesagensAnimal = pesagensExistentes
-      .filter(p => p.animalId === parseInt(formData.animalId) && p.id !== parseInt(id))
-      .sort((a, b) => new Date(b.dataPesagem) - new Date(a.dataPesagem));
-    
-    if (pesagensAnimal.length === 0) return null;
-    return pesagensAnimal[0];
-  };
-
-  const ultimaPesagem = getUltimaPesagemInfo();
-
   return (
     <>
       <div className="welcome-section">
@@ -138,20 +78,13 @@ const EditarPesagem = () => {
         <form onSubmit={handleSubmit} className="animal-form">
           <div className="form-grid">
             <div className="form-group">
-              <label>Animal *</label>
-              <select name="animalId" value={formData.animalId} onChange={handleChange} required>
-                <option value="">Selecione um animal</option>
-                {animais.map(animal => (
-                  <option key={animal.id} value={animal.id}>
-                    {animal.brinco} - {animal.nome}
-                  </option>
-                ))}
-              </select>
+              <label>Animal</label>
+              <input type="text" value={`${formData.animal_brinco} - ${formData.animal_nome}`} disabled />
             </div>
             
             <div className="form-group">
               <label>Data da Pesagem *</label>
-              <input type="date" name="dataPesagem" value={formData.dataPesagem} onChange={handleChange} required />
+              <input type="date" name="data_pesagem" value={formData.data_pesagem} onChange={handleChange} required />
             </div>
             
             <div className="form-group">
@@ -161,18 +94,7 @@ const EditarPesagem = () => {
             
             <div className="form-group">
               <label>Ganho Diário (g/dia)</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                name="ganhoDiario" 
-                value={formData.ganhoDiario || ''} 
-                onChange={handleChange} 
-              />
-              {ganhoCalculado !== null && (
-                <small className="helper-text" style={{ color: ganhoCalculado < 0 ? '#e74c3c' : '#27ae60' }}>
-                  {formatarGanhoDiario(ganhoCalculado)}
-                </small>
-              )}
+              <input type="number" step="0.01" name="ganho_diario" value={formData.ganho_diario || ''} onChange={handleChange} />
             </div>
             
             <div className="form-group">
@@ -184,17 +106,6 @@ const EditarPesagem = () => {
                 <option>Desmame</option>
               </select>
             </div>
-            
-            {ultimaPesagem && (
-              <div className="form-group full-width">
-                <label>Última Pesagem Anterior:</label>
-                <div style={{ background: '#f0f2f5', padding: '10px', borderRadius: '6px' }}>
-                  <p><strong>Data:</strong> {ultimaPesagem.dataPesagem}</p>
-                  <p><strong>Peso:</strong> {ultimaPesagem.peso} kg</p>
-                  <p><strong>Ganho:</strong> {ultimaPesagem.ganhoDiario ? `${ultimaPesagem.ganhoDiario} g/dia` : '-'}</p>
-                </div>
-              </div>
-            )}
             
             <div className="form-group full-width">
               <label>Observações</label>

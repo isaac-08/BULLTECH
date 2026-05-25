@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { syncDashboardStats } from '../utils/syncData';
+import { animaisAPI, lotesAPI, vacinasAPI, pesagensAPI, funcionariosAPI } from '../services/api';
 import StatsCard from '../components/dashboard/StatsCard';
 import GenderChart from '../components/dashboard/GenderChart';
 import VacinasCard from '../components/dashboard/VacinasCard';
 import AnimaisTable from '../components/dashboard/AnimaisTable';
 import PesagensTable from '../components/dashboard/PesagensTable';
-
+import icons from '../assets/icons/index-all';
 
 const DashboardHome = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalAnimais: 0,
     animaisAtivos: 0,
@@ -25,6 +26,10 @@ const DashboardHome = () => {
   const [pesagens, setPesagens] = useState([]);
   const [vacinasData, setVacinasData] = useState([]);
 
+  // Pegando os ícones do dash
+  const dashIcons = icons.dash || {};
+  const { animais: iconAnimais, funcionarios: iconFuncionarios, lotes: iconLotes, vacinas: iconVacinas } = dashIcons;
+
   useEffect(() => {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -32,38 +37,49 @@ const DashboardHome = () => {
       return;
     }
     setUser(JSON.parse(currentUser));
-    
     carregarDados();
   }, [navigate]);
 
-  const carregarDados = () => {
-    const funcionarios = JSON.parse(localStorage.getItem('funcionarios') || '[]');
-    const totalFuncionarios = funcionarios.length;
-    
-    const dashboardStats = syncDashboardStats();
-    setStats({
-      ...dashboardStats,
-      totalFuncionarios
-    });
-    
-    const storedAnimais = localStorage.getItem('animais');
-    const storedPesagens = localStorage.getItem('pesagens');
-    const storedVacinas = localStorage.getItem('vacinas');
-    
-    if (storedAnimais) {
-      const animaisList = JSON.parse(storedAnimais);
+  const carregarDados = async () => {
+    try {
+      setLoading(true);
+      
+      const animaisList = await animaisAPI.getAll();
       setAnimais(animaisList);
-    }
-    if (storedPesagens) {
-      setPesagens(JSON.parse(storedPesagens));
-    }
-    if (storedVacinas) {
-      const vacinas = JSON.parse(storedVacinas);
-      setVacinasData(vacinas.slice(0, 2).map(v => ({
+      
+      const lotesList = await lotesAPI.getAll();
+      
+      const vacinasList = await vacinasAPI.getAll();
+      setVacinasData(vacinasList.slice(0, 2).map(v => ({
         nome: v.nome,
-        data: v.dataAplicacao || v.data_validade,
+        data: v.data_aplicacao ? new Date(v.data_aplicacao).toLocaleDateString('pt-BR') : '-',
         percentual: 100
       })));
+      
+      const pesagensList = await pesagensAPI.getAll();
+      setPesagens(pesagensList);
+      
+      const funcionariosList = await funcionariosAPI.getAll();
+      
+      const totalMachos = animaisList.filter(a => a.sexo === 'Macho').length;
+      const totalFemeas = animaisList.filter(a => a.sexo === 'Fêmea').length;
+      const animaisAtivos = animaisList.filter(a => a.status === 'Ativo').length;
+      
+      setStats({
+        totalAnimais: animaisList.length,
+        animaisAtivos: animaisAtivos,
+        totalLotes: lotesList.length,
+        totalVacinas: vacinasList.length,
+        totalPesagens: pesagensList.length,
+        totalMachos: totalMachos,
+        totalFemeas: totalFemeas,
+        totalFuncionarios: funcionariosList.length
+      });
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados do dashboard:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,17 +100,27 @@ const DashboardHome = () => {
     }));
 
   const pesagensData = [...pesagens]
-    .sort((a, b) => {
-      const dataA = a.dataPesagem?.split('/').reverse().join('-');
-      const dataB = b.dataPesagem?.split('/').reverse().join('-');
-      return new Date(dataB) - new Date(dataA);
-    })
+    .sort((a, b) => new Date(b.data_pesagem) - new Date(a.data_pesagem))
     .slice(0, 4)
     .map(pesagem => ({
-      animal: pesagem.animalNome,
-      data: pesagem.dataPesagem,
-      peso: `${pesagem.peso} kg`
+      animal: pesagem.animal_nome || '-',
+      data: pesagem.data_pesagem ? new Date(pesagem.data_pesagem).toLocaleDateString('pt-BR') : '-',
+      peso: pesagem.peso ? `${pesagem.peso} kg` : '-'
     }));
+
+  if (loading) {
+    return (
+      <>
+        <div className="welcome-section">
+          <h2>Olá {user?.nome || 'Usuário'}!</h2>
+          <p>Veja os detalhes de toda a sua fazenda aqui</p>
+        </div>
+        <div className="page-content">
+          <div className="loading">Carregando dados...</div>
+        </div>
+      </>
+    );
+  }
 
   if (!user) {
     return <div className="loading">Carregando...</div>;
@@ -109,10 +135,10 @@ const DashboardHome = () => {
       
       <div className="page-content">
         <div className="stats-grid">
-          <StatsCard title="Total de Animais" value={stats.totalAnimais} icon="🐄" />
-          <StatsCard title="Total de Funcionários" value={stats.totalFuncionarios} icon="👥" />
-          <StatsCard title="Total de Lotes" value={stats.totalLotes} icon="🐂" />
-          <StatsCard title="Total de Vacinas" value={stats.totalVacinas} icon="💉" />
+          <StatsCard title="Total de Animais" value={stats.totalAnimais} iconImg={iconAnimais} />
+          <StatsCard title="Total de Funcionários" value={stats.totalFuncionarios} iconImg={iconFuncionarios} />
+          <StatsCard title="Total de Lotes" value={stats.totalLotes} iconImg={iconLotes} />
+          <StatsCard title="Total de Vacinas" value={stats.totalVacinas} iconImg={iconVacinas} />
         </div>
 
         <div className="charts-vacinas-grid">

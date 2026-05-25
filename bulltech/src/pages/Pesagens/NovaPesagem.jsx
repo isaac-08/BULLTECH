@@ -1,156 +1,113 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { calcularGanhoDiarioEntrePesagens, formatarGanhoDiario } from '../../utils/calculosPesagem';
+import { pesagensAPI, animaisAPI } from '../../services/api';
+import { calcularGanhoDiarioEntrePesagens } from '../../utils/calculosPesagem';
 
 const NovaPesagem = () => {
   const navigate = useNavigate();
   const [animais, setAnimais] = useState([]);
-  const [pesagensExistentes, setPesagensExistentes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [ganhoCalculado, setGanhoCalculado] = useState(null);
+  const [pesagensExistentes, setPesagensExistentes] = useState([]);
   const [formData, setFormData] = useState({
-    animalId: '',
-    animalNome: '',
-    animalBrinco: '',
-    dataPesagem: '',
+    animal_id: '',
+    animal_nome: '',
+    animal_brinco: '',
+    data_pesagem: '',
     peso: '',
-    ganhoDiario: '',
     tipo: 'Rotina',
     observacoes: ''
   });
+  const [ganhoCalculado, setGanhoCalculado] = useState(null);
 
   useEffect(() => {
-    const storedAnimais = localStorage.getItem('animais');
-    const storedPesagens = localStorage.getItem('pesagens');
-    
-    if (storedAnimais) {
-      setAnimais(JSON.parse(storedAnimais));
-    }
-    if (storedPesagens) {
-      setPesagensExistentes(JSON.parse(storedPesagens));
-    }
+    carregarAnimais();
   }, []);
 
-  // Função para calcular ganho diário
-  const calcularGanhoDiario = (animalId, pesoAtual, dataAtual, pesagens) => {
-    // Filtrar pesagens do mesmo animal
-    const pesagensAnimal = pesagens
-      .filter(p => p.animalId === animalId)
-      .sort((a, b) => {
-        const dataA = a.dataPesagem.split('/').reverse().join('-');
-        const dataB = b.dataPesagem.split('/').reverse().join('-');
-        return new Date(dataB) - new Date(dataA);
-      });
-    
-    if (pesagensAnimal.length === 0) return null;
-    
-    const ultimaPesagem = pesagensAnimal[0];
-    
-    // Converter datas
-    const dataUltima = new Date(ultimaPesagem.dataPesagem.split('/').reverse().join('-'));
-    const dataAtualObj = new Date(dataAtual);
-    
-    const diffDias = Math.floor((dataAtualObj - dataUltima) / (1000 * 60 * 60 * 24));
-    
-    if (diffDias <= 0) return null;
-    
-    const diffPeso = (pesoAtual - ultimaPesagem.peso) * 1000;
-    const ganhoDiario = diffPeso / diffDias;
-    
-    return Math.round(ganhoDiario * 100) / 100;
+  const carregarAnimais = async () => {
+    try {
+      const data = await animaisAPI.getAll();
+      setAnimais(data);
+    } catch (error) {
+      console.error('Erro ao carregar animais:', error);
+    }
   };
 
-  const handleChange = (e) => {
+  const carregarPesagensDoAnimal = async (animalId) => {
+    try {
+      const data = await pesagensAPI.getByAnimal(animalId);
+      setPesagensExistentes(data);
+    } catch (error) {
+      console.error('Erro ao carregar pesagens do animal:', error);
+    }
+  };
+
+  const handleChange = async (e) => {
     const { name, value } = e.target;
     
-    if (name === 'animalId') {
+    if (name === 'animal_id') {
       const animal = animais.find(a => a.id === parseInt(value));
       setFormData({
         ...formData,
-        animalId: value,
-        animalNome: animal ? animal.nome : '',
-        animalBrinco: animal ? animal.brinco : ''
+        animal_id: value,
+        animal_nome: animal ? animal.nome : '',
+        animal_brinco: animal ? animal.brinco : ''
       });
-      setGanhoCalculado(null);
-    } else if (name === 'dataPesagem' || name === 'peso') {
+      if (value) {
+        await carregarPesagensDoAnimal(parseInt(value));
+      }
+    } else if (name === 'data_pesagem' || name === 'peso') {
       setFormData({ ...formData, [name]: value });
       
-      if (formData.animalId && formData.dataPesagem && value) {
-        const dataAtual = name === 'dataPesagem' ? value : formData.dataPesagem;
-        const pesoAtual = name === 'peso' ? parseFloat(value) : parseFloat(formData.peso);
-        
-        if (dataAtual && pesoAtual) {
-          const ganho = calcularGanhoDiario(
-            parseInt(formData.animalId), 
-            pesoAtual, 
-            dataAtual, 
-            pesagensExistentes
-          );
-          setGanhoCalculado(ganho);
-          
-          if (ganho !== null) {
-            setFormData(prev => ({ ...prev, ganhoDiario: ganho.toString() }));
-          } else {
-            setFormData(prev => ({ ...prev, ganhoDiario: '' }));
-          }
-        }
+      // Calcular ganho diário se tiver data e peso
+      if (formData.data_pesagem && formData.peso && name === 'peso') {
+        calcularGanho(formData.data_pesagem, value);
+      } else if (formData.data_pesagem && formData.peso && name === 'data_pesagem') {
+        calcularGanho(value, formData.peso);
       }
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
 
-  const handleSubmit = (e) => {
+  const calcularGanho = (data, peso) => {
+    if (pesagensExistentes.length > 0) {
+      const ultimaPesagem = pesagensExistentes[pesagensExistentes.length - 1];
+      const ganho = calcularGanhoDiarioEntrePesagens(
+        { dataPesagem: data, peso: parseFloat(peso) },
+        { dataPesagem: ultimaPesagem.data_pesagem, peso: ultimaPesagem.peso }
+      );
+      setGanhoCalculado(ganho);
+    } else {
+      setGanhoCalculado(null);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const pesagens = JSON.parse(localStorage.getItem('pesagens') || '[]');
-    const animaisAtuais = JSON.parse(localStorage.getItem('animais') || '[]');
-    
-    const newId = pesagens.length > 0 ? Math.max(...pesagens.map(p => p.id)) + 1 : 1;
-    
-    const novaPesagem = {
-      id: newId,
-      ...formData,
-      peso: parseFloat(formData.peso),
-      ganhoDiario: formData.ganhoDiario ? parseFloat(formData.ganhoDiario) : null,
-      createdAt: new Date().toISOString()
-    };
-    
-    pesagens.push(novaPesagem);
-    localStorage.setItem('pesagens', JSON.stringify(pesagens));
-    
-    const animalIndex = animaisAtuais.findIndex(a => a.id === parseInt(formData.animalId));
-    if (animalIndex !== -1) {
-      animaisAtuais[animalIndex].peso = parseFloat(formData.peso);
-      animaisAtuais[animalIndex].ultimaPesagem = formData.dataPesagem;
-      animaisAtuais[animalIndex].ultimaPesagemId = newId;
+    try {
+      const dadosParaEnviar = {
+        animal_id: parseInt(formData.animal_id),
+        animal_nome: formData.animal_nome,
+        animal_brinco: formData.animal_brinco,
+        data_pesagem: formData.data_pesagem,
+        peso: parseFloat(formData.peso),
+        ganho_diario: ganhoCalculado,
+        tipo: formData.tipo,
+        observacoes: formData.observacoes || null
+      };
       
-      localStorage.setItem('animais', JSON.stringify(animaisAtuais));
-    }
-    
-    setTimeout(() => {
-      setLoading(false);
+      await pesagensAPI.create(dadosParaEnviar);
+      alert('Pesagem salva com sucesso!');
       navigate('/pesagens');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao salvar pesagem:', error);
+      alert('Erro ao salvar pesagem');
+    } finally {
+      setLoading(false);
+    }
   };
-
-  const getUltimaPesagemInfo = () => {
-    if (!formData.animalId) return null;
-    
-    const pesagensAnimal = pesagensExistentes
-      .filter(p => p.animalId === parseInt(formData.animalId))
-      .sort((a, b) => {
-        const dataA = a.dataPesagem.split('/').reverse().join('-');
-        const dataB = b.dataPesagem.split('/').reverse().join('-');
-        return new Date(dataB) - new Date(dataA);
-      });
-    
-    if (pesagensAnimal.length === 0) return null;
-    return pesagensAnimal[0];
-  };
-
-  const ultimaPesagem = getUltimaPesagemInfo();
 
   return (
     <>
@@ -164,7 +121,7 @@ const NovaPesagem = () => {
           <div className="form-grid">
             <div className="form-group">
               <label>Animal *</label>
-              <select name="animalId" onChange={handleChange} required>
+              <select name="animal_id" onChange={handleChange} required>
                 <option value="">Selecione um animal</option>
                 {animais.map(animal => (
                   <option key={animal.id} value={animal.id}>
@@ -176,7 +133,7 @@ const NovaPesagem = () => {
             
             <div className="form-group">
               <label>Data da Pesagem *</label>
-              <input type="date" name="dataPesagem" onChange={handleChange} required />
+              <input type="date" name="data_pesagem" onChange={handleChange} required />
             </div>
             
             <div className="form-group">
@@ -184,22 +141,13 @@ const NovaPesagem = () => {
               <input type="number" step="0.01" name="peso" onChange={handleChange} required placeholder="Peso em quilogramas" />
             </div>
             
-            <div className="form-group">
-              <label>Ganho Diário (g/dia)</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                name="ganhoDiario" 
-                value={formData.ganhoDiario} 
-                onChange={handleChange} 
-                placeholder="Calculado automaticamente"
-              />
-              {ganhoCalculado !== null && (
-                <small className="helper-text" style={{ color: ganhoCalculado < 0 ? '#e74c3c' : '#27ae60' }}>
-                  {formatarGanhoDiario(ganhoCalculado)}
-                </small>
-              )}
-            </div>
+            {ganhoCalculado !== null && (
+              <div className="form-group">
+                <label>Ganho Diário Calculado</label>
+                <input type="text" value={`${ganhoCalculado} g/dia`} disabled style={{ background: '#f0f0f0' }} />
+                <small>Calculado automaticamente com base na última pesagem</small>
+              </div>
+            )}
             
             <div className="form-group">
               <label>Tipo</label>
@@ -210,17 +158,6 @@ const NovaPesagem = () => {
                 <option>Desmame</option>
               </select>
             </div>
-            
-            {ultimaPesagem && (
-              <div className="form-group full-width">
-                <label>Última Pesagem:</label>
-                <div style={{ background: '#f0f2f5', padding: '10px', borderRadius: '6px' }}>
-                  <p><strong>Data:</strong> {ultimaPesagem.dataPesagem}</p>
-                  <p><strong>Peso:</strong> {ultimaPesagem.peso} kg</p>
-                  <p><strong>Ganho:</strong> {ultimaPesagem.ganhoDiario ? `${ultimaPesagem.ganhoDiario} g/dia` : '-'}</p>
-                </div>
-              </div>
-            )}
             
             <div className="form-group full-width">
               <label>Observações</label>

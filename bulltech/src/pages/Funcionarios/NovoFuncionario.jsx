@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { funcionariosAPI } from '../../services/api';
+import { podeAdicionar, getPlanoAtual } from '../../utils/limites';
 
 const NovoFuncionario = () => {
   const navigate = useNavigate();
@@ -15,9 +17,9 @@ const NovoFuncionario = () => {
     cpf: '',
     telefone: '',
     cargo: 'Tratador',
-    nivelAcesso: 'VISUALIZADOR',
+    nivel_acesso: 'VISUALIZADOR',
     salario: '',
-    dataAdmissao: '',
+    data_admissao: '',
     status: 'Ativo',
     observacoes: ''
   });
@@ -40,22 +42,20 @@ const NovoFuncionario = () => {
     { value: 'VISUALIZADOR', label: 'Visualizador - Apenas visualização' }
   ];
 
-  useEffect(() => {
-    // Carregar plano do usuário
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    const plano = currentUser.plano || 'basico';
-    
-    const planos = {
-      basico: { maxFuncionarios: 3, nome: 'Plano Básico' },
-      profissional: { maxFuncionarios: 10, nome: 'Plano Profissional' },
-      empresarial: { maxFuncionarios: 50, nome: 'Plano Empresarial' }
+  // Carregar plano e funcionários atuais
+  React.useEffect(() => {
+    const carregarLimites = async () => {
+      try {
+        const plano = getPlanoAtual();
+        setPlanoLimite(plano);
+        
+        const funcionarios = await funcionariosAPI.getAll();
+        setFuncionariosAtuais(funcionarios.length);
+      } catch (error) {
+        console.error('Erro ao carregar limites:', error);
+      }
     };
-    
-    setPlanoLimite(planos[plano]);
-    
-    // Contar funcionários atuais
-    const funcionarios = JSON.parse(localStorage.getItem('funcionarios') || '[]');
-    setFuncionariosAtuais(funcionarios.length);
+    carregarLimites();
   }, []);
 
   const handleChange = (e) => {
@@ -86,12 +86,12 @@ const NovoFuncionario = () => {
     setFormData({ ...formData, telefone: formatarTelefone(e.target.value) });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Verificar limite do plano
-    if (funcionariosAtuais >= planoLimite.maxFuncionarios) {
-      alert(`Limite do plano atingido! Seu ${planoLimite.nome} permite no máximo ${planoLimite.maxFuncionarios} funcionários. Faça upgrade para adicionar mais.`);
+    if (funcionariosAtuais >= planoLimite?.limites?.funcionarios) {
+      alert(`Limite do plano atingido! Seu ${planoLimite?.nome} permite no máximo ${planoLimite?.limites?.funcionarios} funcionários. Faça upgrade para adicionar mais.`);
       return;
     }
     
@@ -107,56 +107,49 @@ const NovoFuncionario = () => {
     
     setLoading(true);
 
-    const funcionarios = JSON.parse(localStorage.getItem('funcionarios') || '[]');
-    
-    if (funcionarios.some(f => f.email === formData.email)) {
-      alert('Email já cadastrado!');
-      setLoading(false);
-      return;
-    }
-    
-    const newId = funcionarios.length > 0 ? Math.max(...funcionarios.map(f => f.id)) + 1 : 1;
-    
-    const novoFuncionario = {
-      id: newId,
-      nome: formData.nome,
-      email: formData.email,
-      senha: formData.senha,
-      cpf: formData.cpf,
-      telefone: formData.telefone,
-      cargo: formData.cargo,
-      nivelAcesso: formData.nivelAcesso,
-      salario: parseFloat(formData.salario) || 0,
-      dataAdmissao: formData.dataAdmissao,
-      status: formData.status,
-      observacoes: formData.observacoes,
-      createdAt: new Date().toISOString()
-    };
-    
-    funcionarios.push(novoFuncionario);
-    localStorage.setItem('funcionarios', JSON.stringify(funcionarios));
-    
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Preparar dados para enviar ao Supabase
+      const dadosParaEnviar = {
+        nome: formData.nome,
+        email: formData.email,
+        senha: formData.senha,
+        cpf: formData.cpf || null,
+        telefone: formData.telefone || null,
+        cargo: formData.cargo,
+        nivel_acesso: formData.nivel_acesso,
+        salario: parseFloat(formData.salario) || 0,
+        data_admissao: formData.data_admissao,
+        status: formData.status,
+        observacoes: formData.observacoes || null
+      };
+      
+      console.log('Enviando dados do funcionário:', dadosParaEnviar);
+      await funcionariosAPI.create(dadosParaEnviar);
+      alert(`Funcionário ${formData.nome} cadastrado com sucesso!`);
       navigate('/funcionarios');
-    }, 500);
+    } catch (error) {
+      console.error('Erro detalhado ao cadastrar funcionário:', error);
+      alert(`Erro ao cadastrar funcionário: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <>
       <div className="welcome-section">
-        <h2>Adicionar Funcionário</h2>
+        <h2>👥 Adicionar Funcionário</h2>
         <p>Cadastre um novo funcionário na propriedade</p>
       </div>
       
       <div className="page-content">
-        {funcionariosAtuais >= planoLimite?.maxFuncionarios && (
+        {funcionariosAtuais >= planoLimite?.limites?.funcionarios && (
           <div className="limite-alerta critico">
             <div className="limite-info">
               <span className="limite-icon">⚠️</span>
               <div className="limite-texto">
                 <strong>Limite do plano atingido!</strong>
-                <p>Seu {planoLimite?.nome} permite no máximo {planoLimite?.maxFuncionarios} funcionários. 
+                <p>Seu {planoLimite?.nome} permite no máximo {planoLimite?.limites?.funcionarios} funcionários. 
                    <button onClick={() => navigate('/configuracoes')} className="btn-upgrade-inline">Clique aqui</button> para fazer upgrade.</p>
               </div>
             </div>
@@ -167,37 +160,78 @@ const NovoFuncionario = () => {
           <div className="form-grid">
             <div className="form-group">
               <label>Nome Completo *</label>
-              <input type="text" name="nome" onChange={handleChange} required placeholder="Ex: João Silva" />
+              <input 
+                type="text" 
+                name="nome" 
+                value={formData.nome}
+                onChange={handleChange} 
+                required 
+                placeholder="Ex: João Silva" 
+              />
             </div>
             
             <div className="form-group">
               <label>Email *</label>
-              <input type="email" name="email" onChange={handleChange} required placeholder="funcionario@bulltech.com" />
+              <input 
+                type="email" 
+                name="email" 
+                value={formData.email}
+                onChange={handleChange} 
+                required 
+                placeholder="funcionario@bulltech.com" 
+              />
             </div>
             
             <div className="form-group">
               <label>Senha *</label>
-              <input type="password" name="senha" onChange={handleChange} required placeholder="Mínimo 4 caracteres" />
+              <input 
+                type="password" 
+                name="senha" 
+                value={formData.senha}
+                onChange={handleChange} 
+                required 
+                placeholder="Mínimo 4 caracteres" 
+              />
             </div>
             
             <div className="form-group">
               <label>Confirmar Senha *</label>
-              <input type="password" name="confirmarSenha" onChange={handleChange} required placeholder="Digite a senha novamente" />
+              <input 
+                type="password" 
+                name="confirmarSenha" 
+                value={formData.confirmarSenha}
+                onChange={handleChange} 
+                required 
+                placeholder="Digite a senha novamente" 
+              />
             </div>
             
             <div className="form-group">
               <label>CPF</label>
-              <input type="text" name="cpf" value={formData.cpf} onChange={handleCPFChange} placeholder="000.000.000-00" maxLength="14" />
+              <input 
+                type="text" 
+                name="cpf" 
+                value={formData.cpf} 
+                onChange={handleCPFChange} 
+                placeholder="000.000.000-00" 
+                maxLength="14" 
+              />
             </div>
             
             <div className="form-group">
               <label>Telefone</label>
-              <input type="tel" name="telefone" value={formData.telefone} onChange={handleTelefoneChange} placeholder="(11) 99999-9999" />
+              <input 
+                type="tel" 
+                name="telefone" 
+                value={formData.telefone} 
+                onChange={handleTelefoneChange} 
+                placeholder="(11) 99999-9999" 
+              />
             </div>
             
             <div className="form-group">
               <label>Cargo *</label>
-              <select name="cargo" onChange={handleChange} required>
+              <select name="cargo" value={formData.cargo} onChange={handleChange} required>
                 {cargos.map(cargo => (
                   <option key={cargo} value={cargo}>{cargo}</option>
                 ))}
@@ -206,7 +240,7 @@ const NovoFuncionario = () => {
             
             <div className="form-group">
               <label>Nível de Acesso *</label>
-              <select name="nivelAcesso" onChange={handleChange} required>
+              <select name="nivel_acesso" value={formData.nivel_acesso} onChange={handleChange} required>
                 {niveisAcesso.map(nivel => (
                   <option key={nivel.value} value={nivel.value}>{nivel.label}</option>
                 ))}
@@ -215,17 +249,30 @@ const NovoFuncionario = () => {
             
             <div className="form-group">
               <label>Salário (R$)</label>
-              <input type="number" step="0.01" name="salario" onChange={handleChange} placeholder="Ex: 3500.00" />
+              <input 
+                type="number" 
+                step="0.01" 
+                name="salario" 
+                value={formData.salario}
+                onChange={handleChange} 
+                placeholder="Ex: 3500.00" 
+              />
             </div>
             
             <div className="form-group">
               <label>Data de Admissão *</label>
-              <input type="date" name="dataAdmissao" onChange={handleChange} required />
+              <input 
+                type="date" 
+                name="data_admissao" 
+                value={formData.data_admissao}
+                onChange={handleChange} 
+                required 
+              />
             </div>
             
             <div className="form-group">
               <label>Status</label>
-              <select name="status" onChange={handleChange}>
+              <select name="status" value={formData.status} onChange={handleChange}>
                 <option>Ativo</option>
                 <option>Inativo</option>
               </select>
@@ -233,13 +280,23 @@ const NovoFuncionario = () => {
             
             <div className="form-group full-width">
               <label>Observações</label>
-              <textarea name="observacoes" rows="3" onChange={handleChange} placeholder="Observações sobre o funcionário..."></textarea>
+              <textarea 
+                name="observacoes" 
+                rows="3" 
+                value={formData.observacoes}
+                onChange={handleChange} 
+                placeholder="Observações sobre o funcionário..."
+              />
             </div>
           </div>
           
           <div className="form-actions">
             <button type="button" className="btn-cancel" onClick={() => navigate('/funcionarios')}>Cancelar</button>
-            <button type="submit" className="btn-save" disabled={loading || funcionariosAtuais >= planoLimite?.maxFuncionarios}>
+            <button 
+              type="submit" 
+              className="btn-save" 
+              disabled={loading || funcionariosAtuais >= planoLimite?.limites?.funcionarios}
+            >
               {loading ? 'Salvando...' : 'Cadastrar Funcionário'}
             </button>
           </div>

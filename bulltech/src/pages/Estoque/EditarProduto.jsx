@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { estoqueAPI } from '../../services/api';
 
 const EditarProduto = () => {
   const navigate = useNavigate();
@@ -24,41 +25,40 @@ const EditarProduto = () => {
   ];
 
   useEffect(() => {
-    const produtos = JSON.parse(localStorage.getItem('estoque') || '[]');
-    const found = produtos.find(p => p.id === parseInt(id));
-    if (found) {
-      setFormData(found);
-    } else {
+    carregarProduto();
+  }, [id]);
+
+  const carregarProduto = async () => {
+    try {
+      setLoading(true);
+      const data = await estoqueAPI.getOne(id);
+      setFormData(data);
+    } catch (error) {
+      console.error('Erro ao carregar produto:', error);
       navigate('/estoque');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id, navigate]);
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    const produtos = JSON.parse(localStorage.getItem('estoque') || '[]');
-    const index = produtos.findIndex(p => p.id === parseInt(id));
-    
-    if (index !== -1) {
-      produtos[index] = { 
-        ...formData, 
-        quantidade: parseFloat(formData.quantidade),
-        precoUnitario: parseFloat(formData.precoUnitario),
-        updatedAt: new Date().toISOString() 
-      };
-      localStorage.setItem('estoque', JSON.stringify(produtos));
-    }
-    
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      await estoqueAPI.update(id, formData);
+      alert('Produto atualizado com sucesso!');
       navigate('/estoque');
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao atualizar produto:', error);
+      alert('Erro ao atualizar produto');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -83,7 +83,7 @@ const EditarProduto = () => {
     <>
       <div className="welcome-section">
         <h2>Editar Produto</h2>
-        <p>Altere as informações do produto</p>
+        <p>Altere as informações du produto</p>
       </div>
       
       <div className="page-content">
@@ -119,12 +119,12 @@ const EditarProduto = () => {
             
             <div className="form-group">
               <label>Preço Unitário (R$) *</label>
-              <input type="number" step="0.01" name="precoUnitario" value={formData.precoUnitario || ''} onChange={handleChange} required />
+              <input type="number" step="0.01" name="precoUnitario" value={formData.preco_unitario || ''} onChange={handleChange} />
             </div>
             
             <div className="form-group">
               <label>Data de Validade</label>
-              <input type="date" name="dataValidade" value={formData.dataValidade || ''} onChange={handleChange} />
+              <input type="date" name="dataValidade" value={formData.data_validade || ''} onChange={handleChange} />
             </div>
             
             <div className="form-group">
