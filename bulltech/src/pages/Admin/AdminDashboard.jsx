@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
+import './Admin.css';
 
 // Importando os ícones da sidebar
 import homeIcon from '../../assets/icons/home.png';
