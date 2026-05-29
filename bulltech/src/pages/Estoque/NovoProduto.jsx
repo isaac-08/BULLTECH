@@ -40,25 +40,23 @@ const NovoProduto = () => {
     setLoading(true);
 
     try {
-      // Preparar os dados no formato correto para o Supabase
       const produtoParaEnviar = {
         nome: formData.nome,
         categoria: formData.categoria,
         quantidade: parseFloat(formData.quantidade) || 0,
         unidade: formData.unidade,
-        preco_unitario: parseFloat(formData.precoUnitario) || 0,
-        data_validade: formData.dataValidade || null,
+        precoUnitario: parseFloat(formData.precoUnitario) || 0,
+        dataValidade: formData.dataValidade || null,
         fornecedor: formData.fornecedor || null,
         observacoes: formData.observacoes || null
       };
       
-      console.log('Enviando produto:', produtoParaEnviar);
       await estoqueAPI.create(produtoParaEnviar);
       alert('Produto cadastrado com sucesso!');
       navigate('/estoque');
     } catch (error) {
-      console.error('Erro detalhado ao cadastrar produto:', error);
-      alert(`Erro ao cadastrar produto: ${error.message}`);
+      console.error('Erro ao cadastrar produto:', error);
+      alert('Erro ao cadastrar produto');
     } finally {
       setLoading(false);
     }

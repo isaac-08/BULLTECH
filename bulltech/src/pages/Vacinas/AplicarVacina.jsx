@@ -77,18 +77,6 @@ const AplicarVacina = () => {
       };
       
       await vacinasAPI.create(novaAplicacao);
-      
-      // Atualizar quantidade no estoque
-      const estoque = await estoqueAPI.getAll();
-      const vacinaIndex = estoque.findIndex(v => v.id === parseInt(formData.vacinaId));
-      if (vacinaIndex !== -1 && estoque[vacinaIndex].quantidade > 0) {
-        const vacinaAtualizada = {
-          ...estoque[vacinaIndex],
-          quantidade: estoque[vacinaIndex].quantidade - 1
-        };
-        await estoqueAPI.update(formData.vacinaId, vacinaAtualizada);
-      }
-      
       alert('Vacina aplicada com sucesso!');
       navigate('/vacinas');
     } catch (error) {

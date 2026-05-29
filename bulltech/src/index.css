@@ -4086,3 +4086,444 @@ textarea:focus {
   }
 }
 
+/* ==========================================================================
+   ALERTAS E NOTIFICAÇÕES
+   ========================================================================== */
+
+/* Container de alerta - versão melhorada */
+.limite-alerta {
+  margin-bottom: 1.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+  animation: slideInRight 0.4s ease-out;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Alerta de limite crítico */
+.limite-alerta.critico {
+  background: linear-gradient(135deg, #fff5f5 0%, #fee 100%);
+  border-left: 5px solid #e74c3c;
+}
+
+/* Alerta de aviso */
+.limite-alerta.aviso {
+  background: linear-gradient(135deg, #fff8e7 0%, #fffbee 100%);
+  border-left: 5px solid #f39c12;
+}
+
+/* Alerta de sucesso */
+.limite-alerta.sucesso {
+  background: linear-gradient(135deg, #e8f5e9 0%, #f0fff4 100%);
+  border-left: 5px solid #27ae60;
+}
+
+/* Alerta de informação */
+.limite-alerta.info {
+  background: linear-gradient(135deg, #e3f2fd 0%, #e8f4f8 100%);
+  border-left: 5px solid #3498db;
+}
+
+.limite-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.2rem 1.5rem;
+}
+
+.limite-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.limite-texto {
+  flex: 1;
+}
+
+.limite-texto strong {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 0.3rem;
+  color: #2c3e50;
+}
+
+.limite-texto p {
+  font-size: 0.8rem;
+  color: #666;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.btn-upgrade-inline {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: bold;
+  margin-left: 0.3rem;
+  transition: color 0.2s;
+}
+
+.btn-upgrade-inline:hover {
+  color: #c0392b;
+}
+
+/* ==================== MENSAGENS DE ERRO/SUCESSO ==================== */
+
+/* Mensagem de erro */
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: linear-gradient(135deg, #fee 0%, #fdd);
+  color: #c0392b;
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.2rem;
+  font-size: 0.85rem;
+  border-left: 4px solid #e74c3c;
+  animation: shake 0.4s ease-out;
+}
+
+.error-message::before {
+  content: '⚠️';
+  font-size: 1.2rem;
+}
+
+/* Mensagem de sucesso */
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9);
+  color: #2e7d32;
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.2rem;
+  font-size: 0.85rem;
+  border-left: 4px solid #27ae60;
+  animation: slideDown 0.4s ease-out;
+}
+
+.success-message::before {
+  content: '✓';
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+/* Mensagem de informação */
+.info-message {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdef5);
+  color: #1565c0;
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.2rem;
+  font-size: 0.85rem;
+  border-left: 4px solid #2196f3;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.info-message::before {
+  content: 'ℹ️';
+  font-size: 1.2rem;
+}
+
+/* Mensagem de aviso */
+.warning-message {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: linear-gradient(135deg, #fff8e7 0%, #ffecb3);
+  color: #e65100;
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.2rem;
+  font-size: 0.85rem;
+  border-left: 4px solid #ff9800;
+  animation: pulse 0.4s ease-out;
+}
+
+.warning-message::before {
+  content: '⚠️';
+  font-size: 1.2rem;
+}
+
+/* ==================== TOAST NOTIFICATIONS ==================== */
+
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  min-width: 280px;
+  max-width: 350px;
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: white;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  animation: slideInRight 0.3s ease-out;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.toast:hover {
+  transform: translateX(-5px);
+}
+
+.toast-success {
+  border-left: 4px solid #27ae60;
+}
+
+.toast-success .toast-icon {
+  color: #27ae60;
+}
+
+.toast-error {
+  border-left: 4px solid #e74c3c;
+}
+
+.toast-error .toast-icon {
+  color: #e74c3c;
+}
+
+.toast-warning {
+  border-left: 4px solid #f39c12;
+}
+
+.toast-warning .toast-icon {
+  color: #f39c12;
+}
+
+.toast-info {
+  border-left: 4px solid #3498db;
+}
+
+.toast-info .toast-icon {
+  color: #3498db;
+}
+
+.toast-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  font-weight: bold;
+  font-size: 0.85rem;
+  margin-bottom: 0.2rem;
+  color: #2c3e50;
+}
+
+.toast-message {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.toast-close:hover {
+  color: #333;
+}
+
+/* ==================== ANIMAÇÕES ==================== */
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.7; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.7; transform: scale(0.98); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==================== BOTÕES DE ALERTA ==================== */
+
+.btn-danger {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.btn-warning:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+}
+
+/* ==================== ZONA DE PERIGO ==================== */
+
+.danger-zone {
+  background: #fff5f5;
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid #fcd4d4;
+}
+
+.danger-zone h4 {
+  color: #e74c3c;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.danger-zone h4::before {
+  content: '⚠️';
+}
+
+.danger-zone p {
+  font-size: 0.7rem;
+  color: #e74c3c;
+  margin-top: 0.5rem;
+  opacity: 0.8;
+}
+
+/* ==================== BADGES DE STATUS ==================== */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.status-badge.applied {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.applied::before {
+  content: '✓';
+}
+
+.status-badge.pending {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.status-badge.pending::before {
+  content: '⏳';
+}
+
+.status-badge.critical {
+  background: #fee;
+  color: #c0392b;
+}
+
+.status-badge.critical::before {
+  content: '⚠️';
+}
+
+/* ==================== RESPONSIVIDADE ==================== */
+
+@media (max-width: 768px) {
+  .limite-info {
+    padding: 1rem;
+  }
+  
+  .limite-icon {
+    font-size: 1.4rem;
+  }
+  
+  .limite-texto strong {
+    font-size: 0.85rem;
+  }
+  
+  .limite-texto p {
+    font-size: 0.7rem;
+  }
+  
+  .toast {
+    min-width: 260px;
+    max-width: 300px;
+    padding: 0.8rem 1rem;
+  }
+  
+  .error-message,
+  .success-message,
+  .info-message,
+  .warning-message {
+    padding: 0.6rem 1rem;
+    font-size: 0.75rem;
+  }
+}
