@@ -223,7 +223,7 @@ const EditarAnimal = () => {
               </select>
             </div>
             <div className="form-group">
-              <label>Data de Nascimento</label>
+              <label>Data de Chegada</label>
               <input type="date" name="data_nascimento" value={formData.data_nascimento || ''} onChange={handleChange} />
             </div>
             <div className="form-group">
