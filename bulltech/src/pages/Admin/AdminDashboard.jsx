@@ -1,21 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
-import './Admin.css';
-
-// Importando os ícones da sidebar
 import homeIcon from '../../assets/icons/home.png';
 import animaisIcon from '../../assets/icons/animais.png';
 import lotesIcon from '../../assets/icons/lotes.png';
 import vacinasIcon from '../../assets/icons/vacinas.png';
 import usuariosIcon from '../../assets/icons/usuario.png';
 import relatoriosIcon from '../../assets/icons/relatorio.png';
-import configuracoesIcon from '../../assets/icons/config.png';
 import estoqueIcon from '../../assets/icons/estoque.png';
 import funcionariosIcon from '../../assets/icons/funcionarios.png';
 import dietasIcon from '../../assets/icons/dietas.png';
 import pesagemIcon from '../../assets/icons/pesagem.png';
 import reproducaoIcon from '../../assets/icons/repro.png';
+import './Admin.css';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -44,16 +41,15 @@ const AdminDashboard = () => {
       }
     };
     inicializar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const verificarAdmin = async () => {
-    // 1. Verificação rápida local
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
     if (currentUser.email === 'admin@gmail.com' && currentUser.isAdmin === true) {
       return true;
     }
 
-    // 2. Verificação no Supabase
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate('/login');
@@ -79,37 +75,122 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       
-      // Chamada única à View otimizada que criamos no Postgres
-      const { data: viewData, error } = await supabase
-        .from('v_detalhes_fazendas')
+      const { data: usuariosData, error: usuariosError } = await supabase
+        .from('usuarios')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (usuariosError) throw usuariosError;
 
-      const dadosFormatados = viewData || [];
-      setDetalhesFazendas(dadosFormatados);
+      const [animaisRes, lotesRes, vacinasRes, pesagensRes, funcionariosRes, estoqueRes, dietasRes, reproducoesRes] = await Promise.all([
+        supabase.from('animais').select('id, sexo, usuario_id'),
+        supabase.from('lotes').select('id, usuario_id'),
+        supabase.from('vacinas_aplicadas').select('id, usuario_id'),
+        supabase.from('pesagens').select('id, usuario_id'),
+        supabase.from('funcionarios').select('id, usuario_id'),
+        supabase.from('estoque').select('id, quantidade, preco_unitario, usuario_id'),
+        supabase.from('dietas').select('id, usuario_id'),
+        supabase.from('reproducoes').select('id, usuario_id')
+      ]);
 
-      // Calcula os totais agregados usando reduce (operação em memória ultra rápida)
-      const agregados = dadosFormatados.reduce((acc, curr) => {
-        acc.totalAnimais += Number(curr.total_animais || 0);
-        acc.totalLotes += Number(curr.total_lotes || 0);
-        acc.totalVacinas += Number(curr.total_vacinas || 0);
-        acc.totalPesagens += Number(curr.total_pesagens || 0);
-        acc.totalFuncionarios += Number(curr.total_funcionarios || 0);
-        acc.totalEstoque += Number(curr.total_estoque || 0);
-        acc.totalDietas += Number(curr.total_dietas || 0);
-        acc.totalReproducoes += Number(curr.total_reproducoes || 0);
-        return acc;
-      }, {
-        totalAnimais: 0, totalLotes: 0, totalVacinas: 0, totalPesagens: 0,
-        totalFuncionarios: 0, totalEstoque: 0, totalDietas: 0, totalReproducoes: 0
+      const animais = animaisRes.data || [];
+      const lotes = lotesRes.data || [];
+      const vacinas = vacinasRes.data || [];
+      const pesagens = pesagensRes.data || [];
+      const funcionarios = funcionariosRes.data || [];
+      const estoque = estoqueRes.data || [];
+      const dietas = dietasRes.data || [];
+      const reproducoes = reproducoesRes.data || [];
+
+      const animaisPorUsuario = {};
+      const machosPorUsuario = {};
+      const femeasPorUsuario = {};
+      const lotesPorUsuario = {};
+      const vacinasPorUsuario = {};
+      const pesagensPorUsuario = {};
+      const funcionariosPorUsuario = {};
+      const estoquePorUsuario = {};
+      const valorEstoquePorUsuario = {};
+      const dietasPorUsuario = {};
+      const reproducoesPorUsuario = {};
+
+      animais.forEach(animal => {
+        if (!animal.usuario_id) return;
+        animaisPorUsuario[animal.usuario_id] = (animaisPorUsuario[animal.usuario_id] || 0) + 1;
+        if (animal.sexo === 'Macho') {
+          machosPorUsuario[animal.usuario_id] = (machosPorUsuario[animal.usuario_id] || 0) + 1;
+        } else if (animal.sexo === 'Fêmea') {
+          femeasPorUsuario[animal.usuario_id] = (femeasPorUsuario[animal.usuario_id] || 0) + 1;
+        }
       });
 
+      lotes.forEach(lote => {
+        if (lote.usuario_id) lotesPorUsuario[lote.usuario_id] = (lotesPorUsuario[lote.usuario_id] || 0) + 1;
+      });
+
+      vacinas.forEach(vacina => {
+        if (vacina.usuario_id) vacinasPorUsuario[vacina.usuario_id] = (vacinasPorUsuario[vacina.usuario_id] || 0) + 1;
+      });
+
+      pesagens.forEach(pesagem => {
+        if (pesagem.usuario_id) pesagensPorUsuario[pesagem.usuario_id] = (pesagensPorUsuario[pesagem.usuario_id] || 0) + 1;
+      });
+
+      funcionarios.forEach(func => {
+        if (func.usuario_id) funcionariosPorUsuario[func.usuario_id] = (funcionariosPorUsuario[func.usuario_id] || 0) + 1;
+      });
+
+      estoque.forEach(item => {
+        if (!item.usuario_id) return;
+        estoquePorUsuario[item.usuario_id] = (estoquePorUsuario[item.usuario_id] || 0) + 1;
+        valorEstoquePorUsuario[item.usuario_id] = (valorEstoquePorUsuario[item.usuario_id] || 0) + ((item.quantidade || 0) * (item.preco_unitario || 0));
+      });
+
+      dietas.forEach(dieta => {
+        if (dieta.usuario_id) dietasPorUsuario[dieta.usuario_id] = (dietasPorUsuario[dieta.usuario_id] || 0) + 1;
+      });
+
+      reproducoes.forEach(repro => {
+        if (repro.usuario_id) reproducoesPorUsuario[repro.usuario_id] = (reproducoesPorUsuario[repro.usuario_id] || 0) + 1;
+      });
+
+      const fazendasComDados = (usuariosData || []).map(usuario => ({
+        ...usuario,
+        total_animais: animaisPorUsuario[usuario.id] || 0,
+        total_machos: machosPorUsuario[usuario.id] || 0,
+        total_femeas: femeasPorUsuario[usuario.id] || 0,
+        total_lotes: lotesPorUsuario[usuario.id] || 0,
+        total_vacinas: vacinasPorUsuario[usuario.id] || 0,
+        total_pesagens: pesagensPorUsuario[usuario.id] || 0,
+        total_funcionarios: funcionariosPorUsuario[usuario.id] || 0,
+        total_estoque: estoquePorUsuario[usuario.id] || 0,
+        valor_estoque: valorEstoquePorUsuario[usuario.id] || 0,
+        total_dietas: dietasPorUsuario[usuario.id] || 0,
+        total_reproducoes: reproducoesPorUsuario[usuario.id] || 0
+      }));
+      
+      setDetalhesFazendas(fazendasComDados);
+      
+      const totalAnimaisGeral = Object.values(animaisPorUsuario).reduce((a, b) => a + b, 0);
+      const totalLotesGeral = Object.values(lotesPorUsuario).reduce((a, b) => a + b, 0);
+      const totalVacinasGeral = Object.values(vacinasPorUsuario).reduce((a, b) => a + b, 0);
+      const totalPesagensGeral = Object.values(pesagensPorUsuario).reduce((a, b) => a + b, 0);
+      const totalFuncionariosGeral = Object.values(funcionariosPorUsuario).reduce((a, b) => a + b, 0);
+      const totalEstoqueGeral = Object.values(estoquePorUsuario).reduce((a, b) => a + b, 0);
+      const totalDietasGeral = Object.values(dietasPorUsuario).reduce((a, b) => a + b, 0);
+      const totalReproducoesGeral = Object.values(reproducoesPorUsuario).reduce((a, b) => a + b, 0);
+      
       setStats({
-        totalUsuarios: dadosFormatados.length,
-        totalFazendas: dadosFormatados.length,
-        ...agregados
+        totalUsuarios: usuariosData?.length || 0,
+        totalFazendas: usuariosData?.length || 0,
+        totalAnimais: totalAnimaisGeral,
+        totalLotes: totalLotesGeral,
+        totalVacinas: totalVacinasGeral,
+        totalPesagens: totalPesagensGeral,
+        totalFuncionarios: totalFuncionariosGeral,
+        totalEstoque: totalEstoqueGeral,
+        totalDietas: totalDietasGeral,
+        totalReproducoes: totalReproducoesGeral
       });
       
     } catch (error) {
@@ -124,7 +205,9 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard', icon: homeIcon },
     { id: 'fazendas', label: 'Fazendas', icon: usuariosIcon },
     { id: 'animais', label: 'Animais', icon: animaisIcon },
+    { id: 'lotes', label: 'Lotes', icon: lotesIcon },
     { id: 'estoque', label: 'Estoque', icon: estoqueIcon },
+    { id: 'vacinas', label: 'Vacinas', icon: vacinasIcon },
     { id: 'funcionarios', label: 'Funcionários', icon: funcionariosIcon },
     { id: 'dietas', label: 'Dietas', icon: dietasIcon },
     { id: 'relatorios', label: 'Relatórios', icon: relatoriosIcon }
@@ -253,7 +336,7 @@ const AdminDashboard = () => {
                   {(() => {
                     const total = detalhesFazendas.length;
                     const basico = detalhesFazendas.filter(u => (u.plano || 'basico') === 'basico').length;
-                    const profissional = detalhesFazendas.filter(u => u.plano === 'profissional').length;
+                    const profesional = detalhesFazendas.filter(u => u.plano === 'profissional').length;
                     const empresarial = detalhesFazendas.filter(u => u.plano === 'empresarial').length;
                     
                     return (
@@ -270,11 +353,11 @@ const AdminDashboard = () => {
                         <div className="plano-bar">
                           <span>Profissional</span>
                           <div className="bar-container">
-                            <div className="bar" style={{ width: total > 0 ? `${(profissional / total) * 100}%` : '0%' }}>
-                              {total > 0 ? Math.round((profissional / total) * 100) : 0}%
+                            <div className="bar" style={{ width: total > 0 ? `${(profesional / total) * 100}%` : '0%' }}>
+                              {total > 0 ? Math.round((profesional / total) * 100) : 0}%
                             </div>
                           </div>
-                          <span className="bar-count">{profissional} fazendas</span>
+                          <span className="bar-count">{profesional} fazendas</span>
                         </div>
                         <div className="plano-bar">
                           <span>Empresarial</span>
@@ -294,7 +377,7 @@ const AdminDashboard = () => {
           </>
         )}
 
-        {/* Fazendas - Lista detalhada de cada fazenda */}
+        {/* Fazendas - Lista detalhada */}
         {activeTab === 'fazendas' && (
           <div className="admin-table-container">
             <h3>Todas as Fazendas Cadastradas</h3>
@@ -391,19 +474,19 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Estoque - Totais por fazenda */}
-        {activeTab === 'estoque' && (
+        {/* Lotes - Totais por fazenda */}
+        {activeTab === 'lotes' && (
           <div className="admin-table-container">
-            <h3>Distribuição de Estoque por Fazenda</h3>
+            <h3>Distribuição de Lotes por Fazenda</h3>
             <div className="admin-stats-bar">
-              <span>Total Geral: <strong>{stats.totalEstoque}</strong> itens</span>
+              <span>Total Geral: <strong>{stats.totalLotes}</strong> lotes</span>
             </div>
             <div className="table-wrapper">
               <table className="admin-table">
                 <thead>
                   <tr>
                     <th>Fazenda</th>
-                    <th>Itens em Estoque</th>
+                    <th>Total Lotes</th>
                     <th>% do Sistema</th>
                   </tr>
                 </thead>
@@ -411,18 +494,118 @@ const AdminDashboard = () => {
                   {detalhesFazendas.map(fazenda => (
                     <tr key={fazenda.id}>
                       <td><strong>{fazenda.fazenda || fazenda.nome}</strong></td>
-                      <td>{fazenda.total_estoque}</td>
+                      <td>{fazenda.total_lotes}</td>
                       <td>
                         <div className="percent-bar">
-                          <div className="percent-fill" style={{ width: `${stats.totalEstoque > 0 ? (fazenda.total_estoque / stats.totalEstoque) * 100 : 0}%` }}></div>
-                          <span>{stats.totalEstoque > 0 ? Math.round((fazenda.total_estoque / stats.totalEstoque) * 100) : 0}%</span>
+                          <div className="percent-fill" style={{ width: `${stats.totalLotes > 0 ? (fazenda.total_lotes / stats.totalLotes) * 100 : 0}%` }}></div>
+                          <span>{stats.totalLotes > 0 ? Math.round((fazenda.total_lotes / stats.totalLotes) * 100) : 0}%</span>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {detalhesFazendas.length === 0 && (
                     <tr>
-                      <td colSpan="3" className="empty-message">Nenhum item em estoque</td>
+                      <td colSpan="3" className="empty-message">Nenhum lote cadastrado</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Estoque - Totais por fazenda */}
+        {activeTab === 'estoque' && (
+          <div className="admin-table-container">
+            <h3>
+              <img src={estoqueIcon} alt="Estoque" className="icon icon-sm" style={{ marginRight: '8px' }} />
+              Distribuição de Estoque por Fazenda
+            </h3>
+            <div className="admin-stats-bar">
+              <span>Total Geral: <strong>{stats.totalEstoque}</strong> itens em estoque</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fazenda</th>
+                    <th>Itens em Estoque</th>
+                    <th>Valor Total (R$)</th>
+                    <th>% do Sistema</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detalhesFazendas.filter(f => f.total_estoque > 0).length > 0 ? (
+                    detalhesFazendas
+                      .filter(fazenda => fazenda.total_estoque > 0)
+                      .map(fazenda => (
+                        <tr key={fazenda.id}>
+                          <td><strong>{fazenda.fazenda || fazenda.nome}</strong></td>
+                          <td>{fazenda.total_estoque}</td>
+                          <td>R$ {(fazenda.valor_estoque || 0).toFixed(2)}</td>
+                          <td>
+                            <div className="percent-bar">
+                              <div className="percent-fill" style={{ width: `${stats.totalEstoque > 0 ? ((fazenda.total_estoque || 0) / stats.totalEstoque) * 100 : 0}%` }}></div>
+                              <span>{stats.totalEstoque > 0 ? Math.round(((fazenda.total_estoque || 0) / stats.totalEstoque) * 100) : 0}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="empty-message">
+                        <img src={estoqueIcon} alt="Estoque" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                        <br />Nenhum item em estoque cadastrado
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Vacinas - Totais por fazenda */}
+        {activeTab === 'vacinas' && (
+          <div className="admin-table-container">
+            <h3>
+              <img src={vacinasIcon} alt="Vacinas" className="icon icon-sm" style={{ marginRight: '8px' }} />
+              Distribuição de Vacinas por Fazenda
+            </h3>
+            <div className="admin-stats-bar">
+              <span>Total Geral: <strong>{stats.totalVacinas}</strong> doses aplicadas</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Fazenda</th>
+                    <th>Doses Aplicadas</th>
+                    <th>% do Sistema</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detalhesFazendas.filter(f => f.total_vacinas > 0).length > 0 ? (
+                    detalhesFazendas
+                      .filter(fazenda => fazenda.total_vacinas > 0)
+                      .map(fazenda => (
+                        <tr key={fazenda.id}>
+                          <td><strong>{fazenda.fazenda || fazenda.nome}</strong></td>
+                          <td>{fazenda.total_vacinas}</td>
+                          <td>
+                            <div className="percent-bar">
+                              <div className="percent-fill" style={{ width: `${stats.totalVacinas > 0 ? ((fazenda.total_vacinas || 0) / stats.totalVacinas) * 100 : 0}%` }}></div>
+                              <span>{stats.totalVacinas > 0 ? Math.round(((fazenda.total_vacinas || 0) / stats.totalVacinas) * 100) : 0}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  ) : (
+                    <tr>
+                      <td colSpan="3" className="empty-message">
+                        <img src={vacinasIcon} alt="Vacinas" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                        <br />Nenhuma vacina aplicada
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -448,21 +631,27 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {detalhesFazendas.map(fazenda => (
-                    <tr key={fazenda.id}>
-                      <td><strong>{fazenda.fazenda || fazenda.nome}</strong></td>
-                      <td>{fazenda.total_funcionarios}</td>
-                      <td>
-                        <div className="percent-bar">
-                          <div className="percent-fill" style={{ width: `${stats.totalFuncionarios > 0 ? (fazenda.total_funcionarios / stats.totalFuncionarios) * 100 : 0}%` }}></div>
-                          <span>{stats.totalFuncionarios > 0 ? Math.round((fazenda.total_funcionarios / stats.totalFuncionarios) * 100) : 0}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {detalhesFazendas.length === 0 && (
+                  {detalhesFazendas.filter(f => f.total_funcionarios > 0).length > 0 ? (
+                    detalhesFazendas
+                      .filter(fazenda => fazenda.total_funcionarios > 0)
+                      .map(fazenda => (
+                        <tr key={fazenda.id}>
+                          <td><strong>{fazenda.fazenda || fazenda.nome}</strong></td>
+                          <td>{fazenda.total_funcionarios}</td>
+                          <td>
+                            <div className="percent-bar">
+                              <div className="percent-fill" style={{ width: `${stats.totalFuncionarios > 0 ? ((fazenda.total_funcionarios || 0) / stats.totalFuncionarios) * 100 : 0}%` }}></div>
+                              <span>{stats.totalFuncionarios > 0 ? Math.round(((fazenda.total_funcionarios || 0) / stats.totalFuncionarios) * 100) : 0}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  ) : (
                     <tr>
-                      <td colSpan="3" className="empty-message">Nenhum funcionário cadastrado</td>
+                      <td colSpan="3" className="empty-message">
+                        <img src={funcionariosIcon} alt="Funcionários" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                        <br />Nenhum funcionário cadastrado
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -488,21 +677,27 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {detalhesFazendas.map(fazenda => (
-                    <tr key={fazenda.id}>
-                      <td><strong>{fazenda.fazenda || fazenda.nome}</strong></td>
-                      <td>{fazenda.total_dietas}</td>
-                      <td>
-                        <div className="percent-bar">
-                          <div className="percent-fill" style={{ width: `${stats.totalDietas > 0 ? (fazenda.total_dietas / stats.totalDietas) * 100 : 0}%` }}></div>
-                          <span>{stats.totalDietas > 0 ? Math.round((fazenda.total_dietas / stats.totalDietas) * 100) : 0}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {detalhesFazendas.length === 0 && (
+                  {detalhesFazendas.filter(f => f.total_dietas > 0).length > 0 ? (
+                    detalhesFazendas
+                      .filter(fazenda => fazenda.total_dietas > 0)
+                      .map(fazenda => (
+                        <tr key={fazenda.id}>
+                          <td><strong>{fazenda.fazenda || fazenda.nome}</strong></td>
+                          <td>{fazenda.total_dietas}</td>
+                          <td>
+                            <div className="percent-bar">
+                              <div className="percent-fill" style={{ width: `${stats.totalDietas > 0 ? ((fazenda.total_dietas || 0) / stats.totalDietas) * 100 : 0}%` }}></div>
+                              <span>{stats.totalDietas > 0 ? Math.round(((fazenda.total_dietas || 0) / stats.totalDietas) * 100) : 0}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  ) : (
                     <tr>
-                      <td colSpan="3" className="empty-message">Nenhuma dieta cadastrada</td>
+                      <td colSpan="3" className="empty-message">
+                        <img src={dietasIcon} alt="Dietas" className="icon icon-md" style={{ opacity: 0.5, marginBottom: '10px' }} />
+                        <br />Nenhuma dieta cadastrada
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -517,9 +712,7 @@ const AdminDashboard = () => {
             <h3>Relatórios Gerenciais</h3>
             <div className="relatorios-grid">
               <div className="relatorio-card" onClick={() => alert('Relatório geral gerado!')}>
-                <div className="relatorio-icon">
-                  <img src={relatoriosIcon} alt="Relatório" className="icon icon-md" />
-                </div>
+                <div className="relatorio-icon"><img src={relatoriosIcon} alt="Relatório" className="icon icon-md" /></div>
                 <h4>Relatório Geral</h4>
                 <p>Visão completa de todas as fazendas</p>
               </div>

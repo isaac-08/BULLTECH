@@ -261,21 +261,18 @@ export const reproducoesAPI = {
 
     const novaReproducao = {
       ...reproducao,
-      usuario_id: perfil.id
+      usuario_id: perfil.id,
+      animal_id: parseInt(reproducao.animal_id),
+      crias_nascidas: parseInt(reproducao.crias_nascidas) || 0,
+      crias_vivas: parseInt(reproducao.crias_vivas) || 0
     };
-
-    console.log('Inserindo no Supabase:', novaReproducao);
 
     const { data, error } = await supabase
       .from('reproducoes')
       .insert([novaReproducao])
       .select();
 
-    if (error) {
-      console.error('Erro do Supabase:', error);
-      throw error;
-    }
-    
+    if (error) throw error;
     return data[0];
   },
 
@@ -301,10 +298,23 @@ export const reproducoesAPI = {
 // ==================== VACINAS ====================
 export const vacinasAPI = {
   getAll: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuário não autenticado');
+
+    const { data: perfil } = await supabase
+      .from('usuarios')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (!perfil) throw new Error('Perfil não encontrado');
+
     const { data, error } = await supabase
       .from('vacinas_aplicadas')
       .select('*')
+      .eq('usuario_id', perfil.id)
       .order('created_at', { ascending: false });
+
     if (error) throw error;
     return data;
   },
@@ -320,10 +330,28 @@ export const vacinasAPI = {
   },
 
   create: async (vacina) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuário não autenticado');
+
+    const { data: perfil } = await supabase
+      .from('usuarios')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (!perfil) throw new Error('Perfil não encontrado');
+
+    const novaVacina = {
+      ...vacina,
+      usuario_id: perfil.id,
+      animal_id: vacina.animal_id || null
+    };
+
     const { data, error } = await supabase
       .from('vacinas_aplicadas')
-      .insert([vacina])
+      .insert([novaVacina])
       .select();
+
     if (error) throw error;
     return data[0];
   },
@@ -349,7 +377,6 @@ export const vacinasAPI = {
 
 // ==================== PESAGENS ====================
 export const pesagensAPI = {
-  // Buscar todas as pesagens do usuário atual
   getAll: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
@@ -366,13 +393,12 @@ export const pesagensAPI = {
       .from('pesagens')
       .select('*')
       .eq('usuario_id', perfil.id)
-      .order('data_pesagem', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
     return data;
   },
 
-  // Buscar uma pesagem específica
   getOne: async (id) => {
     const { data, error } = await supabase
       .from('pesagens')
@@ -383,31 +409,6 @@ export const pesagensAPI = {
     return data;
   },
 
-  // Buscar pesagens de um animal específico
-  getByAnimal: async (animalId) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Usuário não autenticado');
-
-    const { data: perfil } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!perfil) throw new Error('Perfil não encontrado');
-
-    const { data, error } = await supabase
-      .from('pesagens')
-      .select('*')
-      .eq('usuario_id', perfil.id)
-      .eq('animal_id', animalId)
-      .order('data_pesagem', { ascending: true });
-
-    if (error) throw error;
-    return data;
-  },
-
-  // Criar nova pesagem
   create: async (pesagem) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
@@ -433,19 +434,9 @@ export const pesagensAPI = {
       .select();
 
     if (error) throw error;
-    
-    // Atualizar o peso do animal
-    const { error: updateError } = await supabase
-      .from('animais')
-      .update({ peso: parseFloat(pesagem.peso) })
-      .eq('id', parseInt(pesagem.animal_id));
-    
-    if (updateError) console.error('Erro ao atualizar peso do animal:', updateError);
-    
     return data[0];
   },
 
-  // Atualizar pesagem
   update: async (id, pesagem) => {
     const pesagemAtualizada = {
       data_pesagem: pesagem.data_pesagem,
@@ -455,9 +446,6 @@ export const pesagensAPI = {
       observacoes: pesagem.observacoes
     };
 
-    // Buscar a pesagem antiga para saber o animal_id
-    const pesagemAntiga = await pesagensAPI.getOne(id);
-    
     const { data, error } = await supabase
       .from('pesagens')
       .update(pesagemAtualizada)
@@ -465,57 +453,38 @@ export const pesagensAPI = {
       .select();
 
     if (error) throw error;
-    
-    // Atualizar o peso do animal
-    if (pesagemAntiga && pesagemAntiga.animal_id) {
-      // Buscar a última pesagem do animal
-      const pesagensAnimal = await pesagensAPI.getByAnimal(pesagemAntiga.animal_id);
-      const ultimaPesagem = pesagensAnimal[pesagensAnimal.length - 1];
-      
-      if (ultimaPesagem) {
-        await supabase
-          .from('animais')
-          .update({ peso: ultimaPesagem.peso })
-          .eq('id', pesagemAntiga.animal_id);
-      }
-    }
-    
     return data[0];
   },
 
-  // Deletar pesagem
   delete: async (id) => {
-    // Buscar a pesagem para saber o animal_id
-    const pesagem = await pesagensAPI.getOne(id);
-    const animalId = pesagem?.animal_id;
-    
     const { error } = await supabase
       .from('pesagens')
       .delete()
       .eq('id', id);
-    
     if (error) throw error;
-    
-    // Atualizar o peso do animal com a última pesagem restante
-    if (animalId) {
-      const pesagensRestantes = await pesagensAPI.getByAnimal(animalId);
-      const ultimaPesagem = pesagensRestantes[pesagensRestantes.length - 1];
-      
-      await supabase
-        .from('animais')
-        .update({ peso: ultimaPesagem?.peso || null })
-        .eq('id', animalId);
-    }
   },
 };
 
 // ==================== ESTOQUE ====================
 export const estoqueAPI = {
   getAll: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuário não autenticado');
+
+    const { data: perfil } = await supabase
+      .from('usuarios')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (!perfil) throw new Error('Perfil não encontrado');
+
     const { data, error } = await supabase
       .from('estoque')
       .select('*')
+      .eq('usuario_id', perfil.id)
       .order('created_at', { ascending: false });
+
     if (error) throw error;
     return data;
   },
@@ -531,18 +500,53 @@ export const estoqueAPI = {
   },
 
   create: async (produto) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuário não autenticado');
+
+    const { data: perfil } = await supabase
+      .from('usuarios')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (!perfil) throw new Error('Perfil não encontrado');
+
+    const novoProduto = {
+      nome: produto.nome,
+      categoria: produto.categoria,
+      quantidade: parseFloat(produto.quantidade) || 0,
+      unidade: produto.unidade,
+      preco_unitario: produto.precoUnitario ? parseFloat(produto.precoUnitario) : 0,
+      data_validade: produto.dataValidade || null,
+      fornecedor: produto.fornecedor || null,
+      observacoes: produto.observacoes || null,
+      usuario_id: perfil.id
+    };
+
     const { data, error } = await supabase
       .from('estoque')
-      .insert([produto])
+      .insert([novoProduto])
       .select();
+
     if (error) throw error;
     return data[0];
   },
 
   update: async (id, produto) => {
+    const produtoAtualizado = {
+      nome: produto.nome,
+      categoria: produto.categoria,
+      quantidade: parseFloat(produto.quantidade) || 0,
+      unidade: produto.unidade,
+      preco_unitario: produto.precoUnitario ? parseFloat(produto.precoUnitario) : 0,
+      data_validade: produto.dataValidade || null,
+      fornecedor: produto.fornecedor || null,
+      observacoes: produto.observacoes || null
+    };
+
     const { data, error } = await supabase
       .from('estoque')
-      .update(produto)
+      .update(produtoAtualizado)
       .eq('id', id)
       .select();
     if (error) throw error;
@@ -560,7 +564,6 @@ export const estoqueAPI = {
 
 // ==================== DIETAS ====================
 export const dietasAPI = {
-  // Buscar todas as dietas do usuário
   getAll: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
@@ -583,7 +586,6 @@ export const dietasAPI = {
     return data;
   },
 
-  // Buscar uma dieta específica
   getOne: async (id) => {
     const { data, error } = await supabase
       .from('dietas')
@@ -594,38 +596,6 @@ export const dietasAPI = {
     return data;
   },
 
-  // Buscar dieta com seus alimentos e animais
-  getDietaCompleta: async (id) => {
-    // Buscar dieta
-    const { data: dieta, error: dietaError } = await supabase
-      .from('dietas')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (dietaError) throw dietaError;
-
-    // Buscar alimentos da dieta
-    const { data: alimentos, error: alimentosError } = await supabase
-      .from('dieta_alimentos')
-      .select('*, estoque(*)')
-      .eq('dieta_id', id);
-    if (alimentosError) throw alimentosError;
-
-    // Buscar animais da dieta
-    const { data: animais, error: animaisError } = await supabase
-      .from('dieta_animais')
-      .select('*, animais(*)')
-      .eq('dieta_id', id);
-    if (animaisError) throw animaisError;
-
-    return {
-      ...dieta,
-      alimentos: alimentos || [],
-      animais: animais || []
-    };
-  },
-
-  // Criar nova dieta
   create: async (dieta) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
@@ -639,11 +609,9 @@ export const dietasAPI = {
     if (!perfil) throw new Error('Perfil não encontrado');
 
     const novaDieta = {
+      ...dieta,
       usuario_id: perfil.id,
-      nome: dieta.nome,
-      tipo: dieta.tipo,
-      frequencia: dieta.frequencia,
-      observacoes: dieta.observacoes || null
+      quantidade: parseFloat(dieta.quantidade) || 0
     };
 
     const { data, error } = await supabase
@@ -654,170 +622,27 @@ export const dietasAPI = {
     return data[0];
   },
 
-  // Criar dieta com alimentos e animais
-  createCompleta: async (dieta) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Usuário não autenticado');
-
-    const { data: perfil } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!perfil) throw new Error('Perfil não encontrado');
-
-    // 1. Inserir a dieta
-    const { data: novaDieta, error: dietaError } = await supabase
-      .from('dietas')
-      .insert([{
-        usuario_id: perfil.id,
-        nome: dieta.nome,
-        tipo: dieta.tipo,
-        frequencia: dieta.frequencia,
-        observacoes: dieta.observacoes || null
-      }])
-      .select()
-      .single();
-
-    if (dietaError) throw dietaError;
-
-    // 2. Inserir alimentos
-    if (dieta.alimentos && dieta.alimentos.length > 0) {
-      const alimentosToInsert = dieta.alimentos.map(alimento => ({
-        dieta_id: novaDieta.id,
-        alimento_id: alimento.id,
-        quantidade: parseFloat(alimento.quantidade) || 0,
-        unidade: alimento.unidade
-      }));
-
-      const { error: alimentosError } = await supabase
-        .from('dieta_alimentos')
-        .insert(alimentosToInsert);
-
-      if (alimentosError) throw alimentosError;
-    }
-
-    // 3. Inserir animais
-    if (dieta.animais && dieta.animais.length > 0) {
-      const animaisToInsert = dieta.animais.map(animal => ({
-        dieta_id: novaDieta.id,
-        animal_id: animal.id,
-        animal_brinco: animal.brinco,
-        animal_nome: animal.nome,
-        data_inicio: new Date().toISOString().split('T')[0],
-        status: 'Ativa'
-      }));
-
-      const { error: animaisError } = await supabase
-        .from('dieta_animais')
-        .insert(animaisToInsert);
-
-      if (animaisError) throw animaisError;
-    }
-
-    return novaDieta;
-  },
-
-  // Atualizar dieta
   update: async (id, dieta) => {
     const { data, error } = await supabase
       .from('dietas')
-      .update({
-        nome: dieta.nome,
-        tipo: dieta.tipo,
-        frequencia: dieta.frequencia,
-        observacoes: dieta.observacoes || null
-      })
+      .update(dieta)
       .eq('id', id)
       .select();
     if (error) throw error;
     return data[0];
   },
 
-  // Deletar dieta
   delete: async (id) => {
     const { error } = await supabase
       .from('dietas')
       .delete()
       .eq('id', id);
     if (error) throw error;
-  }
-};
-
-// ==================== DIETAS POR ANIMAL (RELACIONAMENTO) ====================
-export const dietasPorAnimalAPI = {
-  // Adicionar animal a uma dieta
-  addAnimal: async (dietaId, animalId, animalBrinco, animalNome, dataInicio = null) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Usuário não autenticado');
-
-    const { data: perfil } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!perfil) throw new Error('Perfil não encontrado');
-
-    const novaRelacao = {
-      dieta_id: dietaId,
-      animal_id: animalId,
-      animal_brinco: animalBrinco,
-      animal_nome: animalNome,
-      data_inicio: dataInicio || new Date().toISOString().split('T')[0],
-      status: 'Ativa',
-      usuario_id: perfil.id
-    };
-
-    const { data, error } = await supabase
-      .from('dietas_por_animal')
-      .insert([novaRelacao])
-      .select();
-
-    if (error) throw error;
-    return data[0];
   },
-
-  // Buscar todos os animais de uma dieta
-  getAnimaisByDieta: async (dietaId) => {
-    const { data, error } = await supabase
-      .from('dietas_por_animal')
-      .select('*, animais(*)')
-      .eq('dieta_id', dietaId)
-      .eq('status', 'Ativa');
-
-    if (error) throw error;
-    return data;
-  },
-
-  // Buscar todas as dietas de um animal
-  getDietasByAnimal: async (animalId) => {
-    const { data, error } = await supabase
-      .from('dietas_por_animal')
-      .select('*, dietas(*)')
-      .eq('animal_id', animalId)
-      .eq('status', 'Ativa');
-
-    if (error) throw error;
-    return data;
-  },
-
-  // Remover animal de uma dieta
-  removeAnimal: async (dietaId, animalId) => {
-    const { error } = await supabase
-      .from('dietas_por_animal')
-      .delete()
-      .eq('dieta_id', dietaId)
-      .eq('animal_id', animalId);
-
-    if (error) throw error;
-  }
 };
 
 // ==================== FUNCIONÁRIOS ====================
 export const funcionariosAPI = {
-  // Buscar todos os funcionários do usuário atual
   getAll: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
@@ -840,7 +665,6 @@ export const funcionariosAPI = {
     return data;
   },
 
-  // Buscar um funcionário específico
   getOne: async (id) => {
     const { data, error } = await supabase
       .from('funcionarios')
@@ -851,7 +675,6 @@ export const funcionariosAPI = {
     return data;
   },
 
-  // Criar novo funcionário
   create: async (funcionario) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuário não autenticado');
@@ -865,60 +688,29 @@ export const funcionariosAPI = {
     if (!perfil) throw new Error('Perfil não encontrado');
 
     const novoFuncionario = {
-      nome: funcionario.nome,
-      email: funcionario.email,
-      senha: funcionario.senha,
-      cpf: funcionario.cpf || null,
-      telefone: funcionario.telefone || null,
-      cargo: funcionario.cargo,
-      nivel_acesso: funcionario.nivel_acesso,
-      salario: parseFloat(funcionario.salario) || 0,
-      data_admissao: funcionario.data_admissao,
-      status: funcionario.status || 'Ativo',
-      observacoes: funcionario.observacoes || null,
-      usuario_id: perfil.id
+      ...funcionario,
+      usuario_id: perfil.id,
+      salario: parseFloat(funcionario.salario) || 0
     };
-
-    console.log('Inserindo funcionário no Supabase:', novoFuncionario);
 
     const { data, error } = await supabase
       .from('funcionarios')
       .insert([novoFuncionario])
       .select();
-
-    if (error) {
-      console.error('Erro do Supabase:', error);
-      throw error;
-    }
-    
+    if (error) throw error;
     return data[0];
   },
 
-  // Atualizar funcionário
   update: async (id, funcionario) => {
-    const funcionarioAtualizado = {
-      nome: funcionario.nome,
-      email: funcionario.email,
-      cpf: funcionario.cpf || null,
-      telefone: funcionario.telefone || null,
-      cargo: funcionario.cargo,
-      nivel_acesso: funcionario.nivel_acesso,
-      salario: parseFloat(funcionario.salario) || 0,
-      data_admissao: funcionario.data_admissao,
-      status: funcionario.status,
-      observacoes: funcionario.observacoes || null
-    };
-
     const { data, error } = await supabase
       .from('funcionarios')
-      .update(funcionarioAtualizado)
+      .update(funcionario)
       .eq('id', id)
       .select();
     if (error) throw error;
     return data[0];
   },
 
-  // Deletar funcionário
   delete: async (id) => {
     const { error } = await supabase
       .from('funcionarios')
@@ -926,18 +718,4 @@ export const funcionariosAPI = {
       .eq('id', id);
     if (error) throw error;
   },
-
-  // Autenticar funcionário (login)
-  login: async (email, senha) => {
-    const { data, error } = await supabase
-      .from('funcionarios')
-      .select('*')
-      .eq('email', email)
-      .eq('senha', senha)
-      .eq('status', 'Ativo')
-      .single();
-
-    if (error) throw new Error('Email ou senha inválidos');
-    return data;
-  }
 };
