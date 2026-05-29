@@ -5,6 +5,7 @@ import iconsAcoes from '../../assets/icons/acoes';
 import dietaIcon from '../../assets/icons/dietas.png';
 import alimentoIcon from '../../assets/icons/alimento.png';
 import animaisIcon from '../../assets/icons/animais.png';
+import './Dietas.css';
 
 const VisualizarDieta = () => {
   const navigate = useNavigate();
